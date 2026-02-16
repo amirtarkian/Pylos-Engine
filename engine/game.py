@@ -147,8 +147,9 @@ class PylosGame:
             return False
 
         # Check all possible 2x2 squares that include (r, c)
-        for sr in range(max(0, r - 1), min(size - 1, r) + 1):
-            for sc in range(max(0, c - 1), min(size - 1, c) + 1):
+        # sr is the top-left row: sr >= r-1 (to include r), sr+1 < size
+        for sr in range(max(0, r - 1), min(size - 2, r) + 1):
+            for sc in range(max(0, c - 1), min(size - 2, c) + 1):
                 # Square with top-left at (sr, sc)
                 if (
                     board_level[sr, sc] == color
@@ -305,7 +306,9 @@ class PylosGame:
         """Greedy removal of up to 2 pieces after forming a square/line.
 
         Removes pieces from lowest level first (to maximize strategic value).
+        Returns list of removed pieces as (level, row, col) tuples.
         """
+        removed = []
         for _ in range(2):
             removable = self.get_removable_pieces()
             if not removable:
@@ -314,6 +317,8 @@ class PylosGame:
             removable.sort(key=lambda x: (x[0], x[1], x[2]))
             piece = removable[0]
             self.remove(*piece)
+            removed.append(piece)
+        return removed
 
     # ------------------------------------------------------------------
     # Legal actions
@@ -371,13 +376,17 @@ class PylosGame:
         After the action, checks for formation and does greedy removal.
         Pushes state to actions_stack for undo. Switches turn.
         """
+        removed = []
         if action < 30:
             # Placement action
             level, r, c = self.index_to_coords[action]
             success = self.place(level, r, c)
             if not success:
                 raise ValueError(f"Illegal placement action {action} at ({level},{r},{c})")
-            self.actions_stack.append(('place', action, level, r, c))
+            # Check for formation and do greedy removal
+            if self.check_for_removal():
+                removed = self._do_ai_removal()
+            self.actions_stack.append(('place', action, level, r, c, removed))
         else:
             # Raise action
             src_idx, dst_idx = self.raise_action_to_pair[action]
@@ -388,11 +397,10 @@ class PylosGame:
                 raise ValueError(
                     f"Illegal raise action {action}: ({sl},{sr},{sc})->({dl},{dr},{dc})"
                 )
-            self.actions_stack.append(('raise', action, src_idx, dst_idx, sl, sr, sc, dl, dr, dc))
-
-        # Check for formation and do greedy removal
-        if self.check_for_removal():
-            self._do_ai_removal()
+            # Check for formation and do greedy removal
+            if self.check_for_removal():
+                removed = self._do_ai_removal()
+            self.actions_stack.append(('raise', action, src_idx, dst_idx, sl, sr, sc, dl, dr, dc, removed))
 
         # Switch turn
         self.turn *= -1
@@ -400,8 +408,8 @@ class PylosGame:
     def undo_last_action(self):
         """Undo the last action (pop from actions_stack).
 
-        Reverses the placement or raise and switches turn back.
-        NOTE: Does NOT undo removals -- known simplification for MCTS.
+        Reverses the placement or raise, restores any removed pieces,
+        and switches turn back.
         """
         if not self.actions_stack:
             return
@@ -412,12 +420,20 @@ class PylosGame:
         self.turn *= -1
 
         if entry[0] == 'place':
-            _, action, level, r, c = entry
+            _, action, level, r, c, removed = entry
+            # Restore removed pieces first (in reverse order)
+            for rl, rr, rc in reversed(removed):
+                self.board[rl][rr, rc] = self.turn
+                self.reserves[self.turn] -= 1
             # Remove the placed piece and return to reserves
             self.board[level][r, c] = 0
             self.reserves[self.turn] += 1
         elif entry[0] == 'raise':
-            _, action, src_idx, dst_idx, sl, sr, sc, dl, dr, dc = entry
+            _, action, src_idx, dst_idx, sl, sr, sc, dl, dr, dc, removed = entry
+            # Restore removed pieces first (in reverse order)
+            for rl, rr, rc in reversed(removed):
+                self.board[rl][rr, rc] = self.turn
+                self.reserves[self.turn] -= 1
             # Move piece back from destination to source
             self.board[dl][dr, dc] = 0
             self.board[sl][sr, sc] = self.turn

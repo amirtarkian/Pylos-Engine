@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+*.pth
+engine/checkpoints/*.pth
+engine/checkpoints/manifest.json
+.DS_Store
+wandb/

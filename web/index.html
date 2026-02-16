@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pylos</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    /* ── Canvas ────────────────────────────────────────────────── */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    /* ── Shared glassmorphism panel ────────────────────────────── */
+    .glass {
+      background: rgba(20, 20, 45, 0.65);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+
+    /* ── Top Bar ───────────────────────────────────────────────── */
+    #top-bar {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      padding: 10px 28px;
+    }
+
+    .reserve-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .reserve-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .reserve-dot.white { background: #f5f5f0; }
+    .reserve-dot.black { background: #2a2a2a; border-color: rgba(255,255,255,0.25); }
+
+    #turn-indicator {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 4px 14px;
+      border-radius: 6px;
+      background: rgba(74, 108, 247, 0.2);
+      color: #8fa4ff;
+    }
+
+    /* ── Side Panel ────────────────────────────────────────────── */
+    #side-panel {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 240px;
+      z-index: 10;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: calc(100vh - 32px);
+    }
+
+    #side-panel h2 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b0b8d0;
+      margin-bottom: 2px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .control-group label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7a82a0;
+      font-weight: 600;
+    }
+
+    .control-group select,
+    .control-group button {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.06);
+      color: #d4d8e8;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+
+    .control-group select:hover,
+    .control-group select:focus {
+      border-color: rgba(74, 108, 247, 0.5);
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .control-group select option {
+      background: #1a1a2e;
+      color: #d4d8e8;
+    }
+
+    #btn-new-game {
+      margin-top: 4px;
+      padding: 10px 10px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #4a6cf7, #6a3de8);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    #btn-new-game:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    #btn-new-game:active {
+      transform: translateY(0);
+    }
+
+    /* ── Move History ──────────────────────────────────────────── */
+    #move-history-wrapper {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    #move-history {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 260px;
+      font-size: 12px;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      color: #8a90a8;
+      padding: 6px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    #move-history::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #move-history::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+    }
+
+    .move-entry {
+      padding: 3px 6px;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+
+    .move-entry:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .move-entry .move-num {
+      color: #555a70;
+      margin-right: 6px;
+    }
+
+    .move-entry .move-player {
+      font-weight: 600;
+    }
+
+    .move-entry .move-player.white { color: #f5f5f0; }
+    .move-entry .move-player.black { color: #888; }
+
+    /* ── Status Bar ────────────────────────────────────────────── */
+    #status-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      padding: 8px 22px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #a0a8c0;
+      text-align: center;
+      transition: opacity 0.3s, color 0.3s;
+      pointer-events: none;
+    }
+
+    #status-bar.error {
+      color: #ff6b6b;
+    }
+
+    #status-bar.success {
+      color: #51cf66;
+    }
+
+    #status-bar.info {
+      color: #74b9ff;
+    }
+
+    /* ── Hidden helper ─────────────────────────────────────────── */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Three.js canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- Top bar: reserves + turn indicator -->
+  <div id="top-bar" class="glass">
+    <div class="reserve-group">
+      <div class="reserve-dot white"></div>
+      <span id="white-reserves">15</span>
+    </div>
+    <div id="turn-indicator">WHITE'S TURN</div>
+    <div class="reserve-group">
+      <span id="black-reserves">15</span>
+      <div class="reserve-dot black"></div>
+    </div>
+  </div>
+
+  <!-- Side panel: controls -->
+  <div id="side-panel" class="glass">
+    <h2>Pylos</h2>
+
+    <div class="control-group">
+      <label>Mode</label>
+      <select id="sel-mode">
+        <option value="human_vs_ai">Human vs AI</option>
+        <option value="ai_vs_ai">AI vs AI</option>
+        <option value="human_vs_human">Human vs Human</option>
+      </select>
+    </div>
+
+    <div class="control-group" id="group-difficulty">
+      <label>Difficulty</label>
+      <select id="sel-difficulty">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+
+    <div class="control-group" id="group-color">
+      <label>Play As</label>
+      <select id="sel-color">
+        <option value="white">White</option>
+        <option value="black">Black</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <button id="btn-new-game">New Game</button>
+    </div>
+
+    <div id="move-history-wrapper">
+      <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a82a0;font-weight:600;">
+        Move History
+      </label>
+      <div id="move-history"></div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div id="status-bar" class="glass">Ready</div>
+
+  <!-- Three.js import map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

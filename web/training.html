@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pylos — Training Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a1a;
+      color: #d4d8e8;
+      font-family: "SF Pro Display", "Inter", -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    a { color: #8fa4ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b0b8d0;
+    }
+
+    .header a {
+      font-size: 13px;
+      padding: 6px 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      transition: background 0.2s;
+    }
+
+    .header a:hover {
+      background: rgba(255,255,255,0.08);
+      text-decoration: none;
+    }
+
+    /* ── Layout ───────────────────────────────────────── */
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
+    /* ── Cards ───────────────────────────────────────── */
+
+    .card {
+      background: rgba(20, 20, 45, 0.65);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+    }
+
+    .card h2 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b0b8d0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card h2 .badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .badge.training {
+      background: rgba(74, 108, 247, 0.2);
+      color: #8fa4ff;
+    }
+
+    .badge.complete {
+      background: rgba(81, 207, 102, 0.2);
+      color: #51cf66;
+    }
+
+    .badge.idle {
+      background: rgba(255, 255, 255, 0.08);
+      color: #7a82a0;
+    }
+
+    /* ── Stats grid ──────────────────────────────────── */
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-box .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7a82a0;
+      font-weight: 600;
+    }
+
+    .stat-box .value {
+      font-size: 18px;
+      font-weight: 600;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      color: #d4d8e8;
+    }
+
+    .stat-box .value.small {
+      font-size: 14px;
+    }
+
+    /* ── Progress bar ────────────────────────────────── */
+
+    .progress-container {
+      margin-bottom: 16px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .progress-header .games { color: #7a82a0; }
+    .progress-header .pct { color: #d4d8e8; font-weight: 600; }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    .progress-fill.v1 {
+      background: linear-gradient(90deg, #4a6cf7, #6a3de8);
+    }
+
+    .progress-fill.v2 {
+      background: linear-gradient(90deg, #e8563d, #e89b3d);
+    }
+
+    .progress-fill.v3 {
+      background: linear-gradient(90deg, #51cf66, #40c057);
+    }
+
+    .progress-fill.v4 {
+      background: linear-gradient(90deg, #f0c040, #e8a020);
+    }
+
+    /* ── Charts ───────────────────────────────────────── */
+
+    .chart-container {
+      position: relative;
+    }
+
+    .chart-container canvas {
+      width: 100%;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      margin-top: 8px;
+      justify-content: center;
+    }
+
+    .chart-legend span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #7a82a0;
+    }
+
+    .chart-legend .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ── Checkpoint table ─────────────────────────────── */
+
+    .ckpt-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .ckpt-table th {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      color: #7a82a0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .ckpt-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #b0b8d0;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    }
+
+    .ckpt-table tr:hover td {
+      background: rgba(255,255,255,0.03);
+    }
+
+    .ckpt-table .wr-bar {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .ckpt-table .wr-bar.v1 { background: #4a6cf7; }
+    .ckpt-table .wr-bar.v2 { background: #e8563d; }
+    .ckpt-table .wr-bar.v3 { background: #51cf66; }
+    .ckpt-table .wr-bar.v4 { background: #f0c040; }
+
+    .table-scroll {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .table-scroll::-webkit-scrollbar { width: 4px; }
+    .table-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+    /* ── Tabs ─────────────────────────────────────────── */
+
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .tab-btn {
+      padding: 6px 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      color: #7a82a0;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .tab-btn:hover { background: rgba(255,255,255,0.08); }
+
+    .tab-btn.active {
+      background: rgba(74, 108, 247, 0.2);
+      color: #8fa4ff;
+      border-color: rgba(74, 108, 247, 0.3);
+    }
+
+    .tab-btn.active.v2 {
+      background: rgba(232, 86, 61, 0.2);
+      color: #e8563d;
+      border-color: rgba(232, 86, 61, 0.3);
+    }
+
+    .tab-btn.active.v3 {
+      background: rgba(81, 207, 102, 0.2);
+      color: #51cf66;
+      border-color: rgba(81, 207, 102, 0.3);
+    }
+
+    .tab-btn.active.v4 {
+      background: rgba(240, 192, 64, 0.2);
+      color: #f0c040;
+      border-color: rgba(240, 192, 64, 0.3);
+    }
+
+    /* ── Chart zoom controls ──────────────────────────── */
+
+    .chart-zoom {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+      padding: 0 4px;
+    }
+
+    .chart-zoom label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7a82a0;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .chart-zoom input[type="range"] {
+      flex: 1;
+      height: 4px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    .chart-zoom input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #8fa4ff;
+      cursor: pointer;
+      border: 2px solid #0a0a1a;
+    }
+
+    .chart-zoom .zoom-label {
+      font-size: 11px;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      color: #b0b8d0;
+      min-width: 60px;
+      text-align: right;
+    }
+
+    /* ── Responsive ──────────────────────────────────── */
+
+    @media (max-width: 900px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Training Dashboard</h1>
+    <a href="/">Back to Game</a>
+  </div>
+
+  <div class="dashboard">
+    <!-- v3 Run Card (active) -->
+    <div class="card full-width" id="card-v3">
+      <h2>v3 — 1M Run <span class="badge idle" id="badge-v3">IDLE</span></h2>
+      <div class="progress-container">
+        <div class="progress-header">
+          <span class="games" id="games-v3">0 / 0</span>
+          <span class="pct" id="pct-v3">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill v3" id="bar-v3"></div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="label">Value Loss</span>
+          <span class="value" id="vloss-v3">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Policy Loss</span>
+          <span class="value" id="ploss-v3">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Speed</span>
+          <span class="value small" id="speed-v3">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">ETA</span>
+          <span class="value small" id="eta-v3">—</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="loss-v3" height="180"></canvas>
+        <div class="chart-zoom">
+          <label>Zoom</label>
+          <input type="range" id="zoom-v3" min="0" max="100" value="80" />
+          <span class="zoom-label" id="zoom-label-v3">Last 500</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- v4 Run Card (active) -->
+    <div class="card full-width" id="card-v4">
+      <h2>v4 — 1M Deep ResNet <span class="badge idle" id="badge-v4">IDLE</span></h2>
+      <div class="progress-container">
+        <div class="progress-header">
+          <span class="games" id="games-v4">0 / 0</span>
+          <span class="pct" id="pct-v4">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill v4" id="bar-v4"></div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="label">Value Loss</span>
+          <span class="value" id="vloss-v4">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Policy Loss</span>
+          <span class="value" id="ploss-v4">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Speed</span>
+          <span class="value small" id="speed-v4">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">ETA</span>
+          <span class="value small" id="eta-v4">—</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="loss-v4" height="180"></canvas>
+        <div class="chart-zoom">
+          <label>Zoom</label>
+          <input type="range" id="zoom-v4" min="0" max="100" value="80" />
+          <span class="zoom-label" id="zoom-label-v4">Last 500</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- v1 Run Card -->
+    <div class="card" id="card-v1">
+      <h2>v1 — 50k Run <span class="badge idle" id="badge-v1">IDLE</span></h2>
+      <div class="progress-container">
+        <div class="progress-header">
+          <span class="games" id="games-v1">0 / 0</span>
+          <span class="pct" id="pct-v1">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill v1" id="bar-v1"></div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="label">Value Loss</span>
+          <span class="value" id="vloss-v1">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Policy Loss</span>
+          <span class="value" id="ploss-v1">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Speed</span>
+          <span class="value small" id="speed-v1">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">ETA</span>
+          <span class="value small" id="eta-v1">—</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="loss-v1" height="180"></canvas>
+        <div class="chart-zoom">
+          <label>Zoom</label>
+          <input type="range" id="zoom-v1" min="0" max="100" value="80" />
+          <span class="zoom-label" id="zoom-label-v1">Last 500</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- v2 Run Card -->
+    <div class="card" id="card-v2">
+      <h2>v2 — 200k Run <span class="badge idle" id="badge-v2">IDLE</span></h2>
+      <div class="progress-container">
+        <div class="progress-header">
+          <span class="games" id="games-v2">0 / 0</span>
+          <span class="pct" id="pct-v2">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill v2" id="bar-v2"></div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="label">Value Loss</span>
+          <span class="value" id="vloss-v2">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Policy Loss</span>
+          <span class="value" id="ploss-v2">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Speed</span>
+          <span class="value small" id="speed-v2">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">ETA</span>
+          <span class="value small" id="eta-v2">—</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="loss-v2" height="180"></canvas>
+        <div class="chart-zoom">
+          <label>Zoom</label>
+          <input type="range" id="zoom-v2" min="0" max="100" value="80" />
+          <span class="zoom-label" id="zoom-label-v2">Last 500</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ELO Chart -->
+    <div class="card full-width">
+      <h2>ELO Rating Over Time</h2>
+      <div class="chart-container">
+        <canvas id="elo-chart" height="250"></canvas>
+        <div class="chart-legend">
+          <span><span class="dot" style="background:#4a6cf7;"></span> v1</span>
+          <span><span class="dot" style="background:#e8563d;"></span> v2</span>
+          <span><span class="dot" style="background:#51cf66;"></span> v3</span>
+          <span><span class="dot" style="background:#f0c040;"></span> v4</span>
+          <span style="color:#555a70;">Random = 1000 ELO</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkpoint Table -->
+    <div class="card full-width">
+      <h2>Checkpoints</h2>
+      <div class="tab-bar">
+        <button class="tab-btn active" data-filter="all">All</button>
+        <button class="tab-btn" data-filter="v1">v1</button>
+        <button class="tab-btn v2" data-filter="v2">v2</button>
+        <button class="tab-btn v3" data-filter="v3">v3</button>
+        <button class="tab-btn v4" data-filter="v4">v4</button>
+      </div>
+      <div class="table-scroll">
+        <table class="ckpt-table">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Step</th>
+              <th>Win Rate</th>
+              <th>ELO</th>
+              <th>Label</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="ckpt-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ── Utility ──────────────────────────────────────────
+
+function formatTime(seconds) {
+  if (seconds == null || seconds <= 0) return "—";
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function winRateToElo(wr) {
+  const clamped = Math.max(0.01, Math.min(0.99, wr));
+  return 1000 - 400 * Math.log10((1 - clamped) / clamped);
+}
+
+// ── State ────────────────────────────────────────────
+
+const lossHistories = {
+  v1: { value: [], policy: [] },
+  v2: { value: [], policy: [] },
+  v3: { value: [], policy: [] },
+  v4: { value: [], policy: [] },
+};
+
+// Zoom state: slider value 0-100, maps exponentially from 50 points to all
+const zoomState = { v1: 80, v2: 80, v3: 80, v4: 80 };
+
+function getVisibleWindow(run) {
+  const total = lossHistories[run].value.length;
+  if (total === 0) return 0;
+  const slider = zoomState[run];
+  if (slider >= 100) return total; // all data
+  // Exponential mapping: 0 -> 50, 100 -> total
+  const minW = 50;
+  const maxW = total;
+  const t = slider / 100;
+  const w = Math.round(minW * Math.pow(maxW / minW, t));
+  return Math.min(w, total);
+}
+
+function formatWindowLabel(count, total) {
+  if (count >= total) return "All";
+  if (count >= 1000) return `Last ${(count / 1000).toFixed(1)}k`;
+  return `Last ${count}`;
+}
+
+let currentFilter = "all";
+
+// ── DOM refs ─────────────────────────────────────────
+
+const runs = {};
+for (const r of ["v1", "v2", "v3", "v4"]) {
+  runs[r] = {
+    badge:   document.getElementById(`badge-${r}`),
+    games:   document.getElementById(`games-${r}`),
+    pct:     document.getElementById(`pct-${r}`),
+    bar:     document.getElementById(`bar-${r}`),
+    vloss:   document.getElementById(`vloss-${r}`),
+    ploss:   document.getElementById(`ploss-${r}`),
+    speed:   document.getElementById(`speed-${r}`),
+    eta:     document.getElementById(`eta-${r}`),
+    canvas:  document.getElementById(`loss-${r}`),
+    zoom:    document.getElementById(`zoom-${r}`),
+    zoomLbl: document.getElementById(`zoom-label-${r}`),
+  };
+}
+
+// Zoom slider event listeners
+for (const r of ["v1", "v2", "v3", "v4"]) {
+  const slider = runs[r].zoom;
+  if (!slider) continue;
+  slider.addEventListener("input", () => {
+    zoomState[r] = parseInt(slider.value);
+    const w = getVisibleWindow(r);
+    const total = lossHistories[r].value.length;
+    runs[r].zoomLbl.textContent = formatWindowLabel(w, total);
+    drawLossChart(r);
+  });
+}
+
+const eloCanvas = document.getElementById("elo-chart");
+const ckptTbody = document.getElementById("ckpt-tbody");
+
+// ── Tab filtering ────────────────────────────────────
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.dataset.filter;
+    // Re-render table with stored data
+    if (window._lastCheckpoints) renderTable(window._lastCheckpoints);
+  });
+});
+
+// ── Update run stats ─────────────────────────────────
+
+function updateRun(run, data) {
+  const el = runs[run];
+  if (!el) return;
+
+  const status = data.status || "idle";
+  el.badge.textContent = status.toUpperCase();
+  el.badge.className = "badge " +
+    (status === "training" || status === "starting" ? "training" :
+     status === "complete" ? "complete" : "idle");
+
+  const current = data.current_game || 0;
+  const total = data.total_games || 0;
+  const pct = data.percent || 0;
+  el.games.textContent = `${current.toLocaleString()} / ${total.toLocaleString()} games`;
+  el.pct.textContent = `${pct.toFixed(1)}%`;
+  el.bar.style.width = `${pct}%`;
+
+  el.vloss.textContent = data.value_loss != null ? data.value_loss.toFixed(4) : "—";
+  el.ploss.textContent = data.policy_loss != null ? data.policy_loss.toFixed(4) : "—";
+  el.speed.textContent = data.games_per_second != null ? `${data.games_per_second.toFixed(2)}/s` : "—";
+  el.eta.textContent = formatTime(data.eta_seconds);
+
+  if (data.value_loss != null) {
+    const h = lossHistories[run];
+    h.value.push(data.value_loss);
+    h.policy.push(data.policy_loss);
+    // Update zoom label with current window info
+    const w = getVisibleWindow(run);
+    const total = h.value.length;
+    if (runs[run].zoomLbl) {
+      runs[run].zoomLbl.textContent = formatWindowLabel(w, total);
+    }
+    drawLossChart(run);
+  }
+}
+
+// ── Loss chart drawing ───────────────────────────────
+
+function drawLossChart(run) {
+  const canvas = runs[run].canvas;
+  const history = lossHistories[run];
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = rect.width;
+  const h = rect.height;
+  const pad = { top: 20, right: 12, bottom: 24, left: 44 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  if (history.value.length < 2) {
+    ctx.fillStyle = "#555a70";
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("Waiting for data...", w / 2, h / 2);
+    return;
+  }
+
+  // Apply zoom window — show only the last N points
+  const visibleCount = getVisibleWindow(run);
+  const total = history.value.length;
+  const startIdx = Math.max(0, total - visibleCount);
+  const vValues = history.value.slice(startIdx);
+  const pValues = history.policy.slice(startIdx);
+
+  const allVals = [...vValues, ...pValues];
+  const maxVal = Math.max(...allVals, 0.001);
+  const minVal = Math.min(...allVals, 0);
+  const range = maxVal - minVal || 1;
+
+  // Grid lines and Y labels
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.font = "10px system-ui";
+  ctx.textAlign = "right";
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const val = minVal + (i / yTicks) * range;
+    const y = pad.top + ch - (i / yTicks) * ch;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = "#555a70";
+    ctx.fillText(val.toFixed(2), pad.left - 6, y + 3);
+  }
+
+  // Downsample if too many points for the pixel width
+  function downsample(data, maxPoints) {
+    if (data.length <= maxPoints) return data;
+    const step = data.length / maxPoints;
+    const result = [];
+    for (let i = 0; i < maxPoints; i++) {
+      const start = Math.floor(i * step);
+      const end = Math.floor((i + 1) * step);
+      let sum = 0;
+      for (let j = start; j < end; j++) sum += data[j];
+      result.push(sum / (end - start));
+    }
+    return result;
+  }
+
+  const maxPixelPoints = Math.floor(cw);
+  const dsValue = downsample(vValues, maxPixelPoints);
+  const dsPolicy = downsample(pValues, maxPixelPoints);
+
+  function drawLine(data, color) {
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < data.length; i++) {
+      const x = pad.left + (i / (data.length - 1)) * cw;
+      const y = pad.top + ch - ((data[i] - minVal) / range) * ch;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  drawLine(dsValue, "#4a6cf7");
+  drawLine(dsPolicy, "#6a3de8");
+
+  // Legend
+  ctx.font = "11px system-ui";
+  ctx.fillStyle = "#4a6cf7";
+  ctx.textAlign = "left";
+  ctx.fillText("value loss", pad.left + 4, 14);
+  ctx.fillStyle = "#6a3de8";
+  ctx.fillText("policy loss", pad.left + 80, 14);
+}
+
+// ── ELO chart drawing ────────────────────────────────
+
+function drawEloChart(checkpoints) {
+  const canvas = eloCanvas;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = rect.width;
+  const h = rect.height;
+  const pad = { top: 20, right: 16, bottom: 28, left: 48 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const seriesMap = { v1: [], v2: [], v3: [], v4: [] };
+  for (const cp of checkpoints) {
+    if (cp.win_rate_vs_random == null) continue; // skip "Evaluating..." entries
+    const elo = cp.elo != null ? cp.elo : winRateToElo(cp.win_rate_vs_random ?? 0.5);
+    const ver = cp.version || "v1";
+    if (!seriesMap[ver]) seriesMap[ver] = [];
+    seriesMap[ver].push({ step: cp.step, elo });
+  }
+
+  const allPoints = Object.values(seriesMap).flat();
+  if (allPoints.length === 0) {
+    ctx.fillStyle = "#555a70";
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("Waiting for checkpoint data...", w / 2, h / 2);
+    return;
+  }
+
+  const maxStep = Math.max(...allPoints.map(p => p.step), 1);
+  const allElos = allPoints.map(p => p.elo);
+  let minElo = Math.min(...allElos);
+  let maxElo = Math.max(...allElos);
+
+  if (maxElo - minElo < 100) {
+    const mid = (maxElo + minElo) / 2;
+    minElo = mid - 100;
+    maxElo = mid + 100;
+  }
+
+  const eloRange = maxElo - minElo;
+  minElo -= eloRange * 0.1;
+  maxElo += eloRange * 0.1;
+  const finalRange = maxElo - minElo;
+
+  function toX(step) { return pad.left + (step / maxStep) * cw; }
+  function toY(elo) { return pad.top + ch - ((elo - minElo) / finalRange) * ch; }
+
+  // Grid + Y axis
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  ctx.font = "10px system-ui";
+  ctx.textAlign = "right";
+  const yTicks = 6;
+  for (let i = 0; i <= yTicks; i++) {
+    const elo = minElo + (i / yTicks) * finalRange;
+    const y = toY(elo);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = "#555a70";
+    ctx.fillText(Math.round(elo), pad.left - 6, y + 3);
+  }
+
+  // Random baseline at 1000
+  if (1000 >= minElo && 1000 <= maxElo) {
+    const y1000 = toY(1000);
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y1000);
+    ctx.lineTo(w - pad.right, y1000);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#555a70";
+    ctx.font = "9px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("Random", w - pad.right - 42, y1000 - 4);
+  }
+
+  // X axis labels
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#555a70";
+  ctx.font = "10px system-ui";
+  const xTicks = Math.min(8, Math.max(2, Math.floor(maxStep / 2000)));
+  for (let i = 0; i <= xTicks; i++) {
+    const step = Math.round((i / xTicks) * maxStep);
+    const x = toX(step);
+    const label = step >= 1000 ? `${(step / 1000).toFixed(0)}k` : `${step}`;
+    ctx.fillText(label, x, h - 8);
+  }
+
+  // X axis title
+  ctx.fillStyle = "#555a70";
+  ctx.font = "10px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("games played", pad.left + cw / 2, h - 0);
+
+  // Draw series
+  function drawSeries(points, color) {
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(toX(points[0].step), toY(points[0].elo), 4, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < points.length; i++) {
+      const x = toX(points[i].step);
+      const y = toY(points[i].elo);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill area under curve
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = color;
+    ctx.lineTo(toX(points[points.length - 1].step), pad.top + ch);
+    ctx.lineTo(toX(points[0].step), pad.top + ch);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Endpoint dot
+    const last = points[points.length - 1];
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(toX(last.step), toY(last.elo), 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Endpoint ELO label
+    ctx.fillStyle = color;
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(Math.round(last.elo), toX(last.step) + 8, toY(last.elo) + 4);
+  }
+
+  const seriesColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040" };
+  for (const [ver, points] of Object.entries(seriesMap)) {
+    drawSeries(points, seriesColors[ver] || "#aaa");
+  }
+}
+
+// ── Checkpoint table ─────────────────────────────────
+
+function renderTable(checkpoints) {
+  window._lastCheckpoints = checkpoints;
+  ckptTbody.innerHTML = "";
+
+  const filtered = currentFilter === "all"
+    ? checkpoints
+    : checkpoints.filter(cp => cp.version === currentFilter);
+
+  // Show newest first
+  const sorted = [...filtered].reverse();
+
+  for (const cp of sorted) {
+    const elo = cp.elo != null ? cp.elo : winRateToElo(cp.win_rate_vs_prev ?? cp.win_rate_vs_random ?? 0.5);
+    const wr = cp.win_rate_vs_prev ?? cp.win_rate_vs_random ?? 0.5;
+    const wrPct = Math.round(wr * 100);
+    const ver = cp.version || "v1";
+    const barWidth = Math.max(2, wrPct);
+    const ts = cp.timestamp ? new Date(cp.timestamp).toLocaleString() : "—";
+
+    const verColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040" };
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="color:${verColors[ver] || "#4a6cf7"};font-weight:600;">${ver.toUpperCase()}</td>
+      <td>${cp.step?.toLocaleString() || "?"}</td>
+      <td><span class="wr-bar ${ver}" style="width:${barWidth}px;"></span>${wrPct}%</td>
+      <td>${Math.round(elo)}</td>
+      <td style="color:#7a82a0;">${cp.label || "?"}</td>
+      <td style="color:#555a70;font-size:10px;">${ts}</td>
+    `;
+    ckptTbody.appendChild(tr);
+  }
+}
+
+// ── Polling ──────────────────────────────────────────
+
+async function poll() {
+  try {
+    const [statusResp, ckptResp] = await Promise.all([
+      fetch("/training/status").then(r => r.json()),
+      fetch("/checkpoints").then(r => r.json()),
+    ]);
+
+    if (statusResp.v1) updateRun("v1", statusResp.v1);
+    if (statusResp.v2) updateRun("v2", statusResp.v2);
+    if (statusResp.v3) updateRun("v3", statusResp.v3);
+    if (statusResp.v4) updateRun("v4", statusResp.v4);
+
+    const checkpoints = ckptResp.checkpoints || [];
+    drawEloChart(checkpoints);
+    renderTable(checkpoints);
+  } catch (err) {
+    console.error("Poll failed:", err);
+  }
+}
+
+// Load full loss history on page load so charts survive reloads
+async function loadLossHistory() {
+  try {
+    const resp = await fetch("/training/loss-history");
+    const history = await resp.json();
+    for (const [run, entries] of Object.entries(history)) {
+      if (!lossHistories[run]) continue;
+      lossHistories[run].value = entries.map(e => e.value_loss);
+      lossHistories[run].policy = entries.map(e => e.policy_loss);
+      drawLossChart(run);
+    }
+  } catch (err) {
+    console.error("Failed to load loss history:", err);
+  }
+}
+
+// Initial load: fetch persisted history first, then start polling
+loadLossHistory().then(() => {
+  poll();
+  setInterval(poll, 3000);
+});
+</script>
+
+</body>
+</html>

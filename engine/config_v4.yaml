@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────────
 
 training:
-  selfplay_games: 500000
+  selfplay_games: 1000000
   search_iterations: 64
   batch_size: 256
   replay_buffer_size: 32768

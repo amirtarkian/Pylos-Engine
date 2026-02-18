@@ -168,7 +168,7 @@
       transform: translateY(0);
     }
 
-    /* ── Move History ──────────────────────────────────────────── */
+    /* ── Move History (chess-style paired layout) ────────────── */
     #move-history-wrapper {
       flex: 1;
       min-height: 0;
@@ -181,13 +181,13 @@
       flex: 1;
       overflow-y: auto;
       max-height: 260px;
-      font-size: 12px;
+      font-size: 11px;
       font-family: "SF Mono", "Fira Code", "Consolas", monospace;
       color: #8a90a8;
-      padding: 6px 0;
+      padding: 4px 0;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
     }
 
     #move-history::-webkit-scrollbar {
@@ -199,27 +199,99 @@
       border-radius: 2px;
     }
 
-    .move-entry {
-      padding: 3px 6px;
-      border-radius: 4px;
-      transition: background 0.15s;
+    .move-row {
+      display: grid;
+      grid-template-columns: 26px 1fr 1fr;
+      gap: 2px;
+      align-items: center;
     }
 
-    .move-entry:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .move-entry .move-num {
+    .move-num-cell {
       color: #555a70;
-      margin-right: 6px;
+      font-size: 10px;
+      text-align: right;
+      padding-right: 4px;
+      user-select: none;
     }
 
-    .move-entry .move-player {
+    .move-cell {
+      padding: 3px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 11px;
+    }
+
+    .move-cell:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .move-cell.active {
+      background: rgba(74, 108, 247, 0.25);
+      color: #c0ccff;
+    }
+
+    .move-cell.white-move { color: #e8e8e0; }
+    .move-cell.black-move { color: #999; }
+    .move-cell.placeholder { color: #3a3e50; cursor: default; }
+    .move-cell.placeholder:hover { background: transparent; }
+
+    .move-cell .move-time {
+      color: #444860;
+      font-size: 9px;
+      margin-left: 2px;
+    }
+
+    /* Move position indicator */
+    #move-position {
+      text-align: center;
+      font-size: 10px;
+      color: #7a82a0;
+      font-family: "SF Mono", monospace;
+      padding: 2px 0;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Move Navigation ─────────────────────────────────────────── */
+    #move-nav {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+      padding: 6px 0 2px;
+    }
+
+    #move-nav button {
+      flex: 1;
+      padding: 5px 0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #d4d8e8;
+      font-size: 13px;
+      font-family: inherit;
       font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
     }
 
-    .move-entry .move-player.white { color: #f5f5f0; }
-    .move-entry .move-player.black { color: #888; }
+    #move-nav button:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(74, 108, 247, 0.4);
+    }
+
+    #move-nav button:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+
+    #move-nav button.live-active {
+      background: rgba(74, 108, 247, 0.25);
+      border-color: rgba(74, 108, 247, 0.5);
+      color: #8fa4ff;
+    }
 
     /* ── Status Bar ────────────────────────────────────────────── */
     #status-bar {
@@ -249,6 +321,240 @@
       color: #74b9ff;
     }
 
+    /* ── Training Dashboard (left panel) ─────────────────────────── */
+    #training-panel {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: 260px;
+      z-index: 10;
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.3s;
+    }
+
+    #training-panel h2 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b0b8d0;
+      margin-bottom: 0;
+    }
+
+    #training-panel .train-status {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      display: inline-block;
+      width: fit-content;
+    }
+
+    #training-panel .train-status.training {
+      background: rgba(74, 108, 247, 0.2);
+      color: #8fa4ff;
+    }
+
+    #training-panel .train-status.complete {
+      background: rgba(81, 207, 102, 0.2);
+      color: #51cf66;
+    }
+
+    #training-panel .train-status.idle {
+      background: rgba(255, 255, 255, 0.08);
+      color: #7a82a0;
+    }
+
+    .train-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .train-tab {
+      flex: 1;
+      padding: 5px 0;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      color: #7a82a0;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .train-tab:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .train-tab.active {
+      background: rgba(74, 108, 247, 0.2);
+      color: #8fa4ff;
+      border-color: rgba(74, 108, 247, 0.3);
+    }
+
+    .train-run-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .train-run-panel.active {
+      display: flex;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4a6cf7, #6a3de8);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    .train-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .train-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .train-stat .stat-label {
+      color: #7a82a0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .train-stat .stat-value {
+      color: #d4d8e8;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* Mini loss chart */
+    .loss-chart-canvas {
+      width: 100%;
+      height: 80px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    /* ELO chart */
+    #elo-chart {
+      width: 100%;
+      height: 120px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .elo-chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .elo-chart-header label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7a82a0;
+      font-weight: 600;
+    }
+
+    .elo-legend {
+      display: flex;
+      gap: 10px;
+      font-size: 9px;
+    }
+
+    .elo-legend span {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .elo-legend .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Checkpoint list in training panel */
+    .checkpoint-list {
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .checkpoint-list::-webkit-scrollbar { width: 4px; }
+    .checkpoint-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+    .ckpt-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 11px;
+      transition: background 0.15s;
+    }
+
+    .ckpt-entry:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .ckpt-entry .ckpt-label {
+      color: #d4d8e8;
+      font-weight: 500;
+    }
+
+    .ckpt-entry .ckpt-wr {
+      color: #7a82a0;
+      font-family: "SF Mono", monospace;
+    }
+
+    .ckpt-entry .ckpt-play-btn {
+      padding: 2px 8px;
+      border: 1px solid rgba(74, 108, 247, 0.4);
+      border-radius: 4px;
+      background: transparent;
+      color: #8fa4ff;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .ckpt-entry .ckpt-play-btn:hover {
+      background: rgba(74, 108, 247, 0.2);
+    }
+
     /* ── Hidden helper ─────────────────────────────────────────── */
     .hidden {
       display: none !important;
@@ -258,6 +564,164 @@
 <body>
   <!-- Three.js canvas -->
   <div id="canvas-container"></div>
+
+  <!-- Training panel toggle button -->
+  <button id="btn-toggle-training" class="glass"
+    style="position:fixed;top:16px;left:16px;z-index:11;
+           padding:8px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;
+           background:rgba(20,20,45,0.65);color:#b0b8d0;font-size:12px;
+           font-weight:600;letter-spacing:0.5px;cursor:pointer;
+           transition:background 0.2s;">
+    Training ▼
+  </button>
+
+  <!-- Training Dashboard (left panel) -->
+  <div id="training-panel" class="glass hidden">
+    <h2>Training</h2>
+
+    <!-- Active training: v4 -->
+    <div class="train-run-panel active" id="train-run-v4">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a82a0;font-weight:600;">V4 — Deep ResNet</label>
+        <span id="train-status-badge-v4" class="train-status idle">IDLE</span>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+          <span id="train-progress-text-v4" style="color:#7a82a0;">0 / 0 games</span>
+          <span id="train-percent-v4" style="color:#d4d8e8;font-weight:600;">0%</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="train-progress-bar-v4" style="background:linear-gradient(90deg, #f0c040, #e8a020);"></div>
+        </div>
+      </div>
+
+      <div class="train-stats">
+        <div class="train-stat">
+          <span class="stat-label">Value Loss</span>
+          <span class="stat-value" id="train-vloss-v4">—</span>
+        </div>
+        <div class="train-stat">
+          <span class="stat-label">Policy Loss</span>
+          <span class="stat-value" id="train-ploss-v4">—</span>
+        </div>
+        <div class="train-stat">
+          <span class="stat-label">Speed</span>
+          <span class="stat-value" id="train-speed-v4">—</span>
+        </div>
+        <div class="train-stat">
+          <span class="stat-label">ETA</span>
+          <span class="stat-value" id="train-eta-v4">—</span>
+        </div>
+      </div>
+
+      <canvas id="loss-chart-v4" class="loss-chart-canvas"></canvas>
+    </div>
+
+    <!-- Past trainings (collapsed) -->
+    <div>
+      <button id="btn-past-trainings" style="width:100%;padding:5px 0;border:1px solid rgba(255,255,255,0.1);
+        border-radius:6px;background:rgba(255,255,255,0.04);color:#7a82a0;font-size:11px;
+        font-weight:600;letter-spacing:0.5px;cursor:pointer;text-align:center;">
+        Past Trainings ▼
+      </button>
+      <div id="past-trainings" class="hidden" style="display:none;flex-direction:column;gap:10px;margin-top:8px;">
+        <div class="train-tabs">
+          <button class="train-tab past-tab active" data-run="v1">v1</button>
+          <button class="train-tab past-tab" data-run="v2">v2</button>
+          <button class="train-tab past-tab" data-run="v3">v3</button>
+        </div>
+
+        <div class="train-run-panel active" id="train-run-v1">
+          <span id="train-status-badge-v1" class="train-status idle">IDLE</span>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+              <span id="train-progress-text-v1" style="color:#7a82a0;">0 / 0 games</span>
+              <span id="train-percent-v1" style="color:#d4d8e8;font-weight:600;">0%</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="train-progress-bar-v1"></div>
+            </div>
+          </div>
+          <div class="train-stats">
+            <div class="train-stat"><span class="stat-label">Value Loss</span><span class="stat-value" id="train-vloss-v1">—</span></div>
+            <div class="train-stat"><span class="stat-label">Policy Loss</span><span class="stat-value" id="train-ploss-v1">—</span></div>
+            <div class="train-stat"><span class="stat-label">Speed</span><span class="stat-value" id="train-speed-v1">—</span></div>
+            <div class="train-stat"><span class="stat-label">ETA</span><span class="stat-value" id="train-eta-v1">—</span></div>
+          </div>
+          <canvas id="loss-chart-v1" class="loss-chart-canvas"></canvas>
+        </div>
+
+        <div class="train-run-panel" id="train-run-v2">
+          <span id="train-status-badge-v2" class="train-status idle">IDLE</span>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+              <span id="train-progress-text-v2" style="color:#7a82a0;">0 / 0 games</span>
+              <span id="train-percent-v2" style="color:#d4d8e8;font-weight:600;">0%</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="train-progress-bar-v2"></div>
+            </div>
+          </div>
+          <div class="train-stats">
+            <div class="train-stat"><span class="stat-label">Value Loss</span><span class="stat-value" id="train-vloss-v2">—</span></div>
+            <div class="train-stat"><span class="stat-label">Policy Loss</span><span class="stat-value" id="train-ploss-v2">—</span></div>
+            <div class="train-stat"><span class="stat-label">Speed</span><span class="stat-value" id="train-speed-v2">—</span></div>
+            <div class="train-stat"><span class="stat-label">ETA</span><span class="stat-value" id="train-eta-v2">—</span></div>
+          </div>
+          <canvas id="loss-chart-v2" class="loss-chart-canvas"></canvas>
+        </div>
+
+        <div class="train-run-panel" id="train-run-v3">
+          <span id="train-status-badge-v3" class="train-status idle">IDLE</span>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+              <span id="train-progress-text-v3" style="color:#7a82a0;">0 / 0 games</span>
+              <span id="train-percent-v3" style="color:#d4d8e8;font-weight:600;">0%</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="train-progress-bar-v3"></div>
+            </div>
+          </div>
+          <div class="train-stats">
+            <div class="train-stat"><span class="stat-label">Value Loss</span><span class="stat-value" id="train-vloss-v3">—</span></div>
+            <div class="train-stat"><span class="stat-label">Policy Loss</span><span class="stat-value" id="train-ploss-v3">—</span></div>
+            <div class="train-stat"><span class="stat-label">Speed</span><span class="stat-value" id="train-speed-v3">—</span></div>
+            <div class="train-stat"><span class="stat-label">ETA</span><span class="stat-value" id="train-eta-v3">—</span></div>
+          </div>
+          <canvas id="loss-chart-v3" class="loss-chart-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ELO chart (shared across runs) -->
+    <div>
+      <div class="elo-chart-header">
+        <label>ELO Rating</label>
+        <div class="elo-legend">
+          <span><span class="dot" style="background:#4a6cf7;"></span> <span style="color:#4a6cf7;">v1</span></span>
+          <span><span class="dot" style="background:#e8563d;"></span> <span style="color:#e8563d;">v2</span></span>
+          <span><span class="dot" style="background:#51cf66;"></span> <span style="color:#51cf66;">v3</span></span>
+          <span><span class="dot" style="background:#f0c040;"></span> <span style="color:#f0c040;">v4</span></span>
+        </div>
+      </div>
+      <canvas id="elo-chart"></canvas>
+    </div>
+
+    <div>
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#7a82a0;font-weight:600;">
+        Checkpoints
+      </label>
+      <div class="checkpoint-list" id="checkpoint-list"></div>
+    </div>
+
+    <a href="/training" target="_blank"
+       style="display:block;text-align:center;font-size:11px;color:#8fa4ff;
+              padding:6px;border:1px solid rgba(255,255,255,0.08);border-radius:6px;
+              background:rgba(255,255,255,0.03);text-decoration:none;margin-top:4px;">
+      Full Dashboard &rarr;
+    </a>
+  </div>
 
   <!-- Top bar: reserves + turn indicator -->
   <div id="top-bar" class="glass">
@@ -292,12 +756,45 @@
       </select>
     </div>
 
+    <div class="control-group hidden" id="group-ai-white">
+      <label>White AI</label>
+      <select id="sel-ai-white">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+
+    <div class="control-group hidden" id="group-ai-black">
+      <label>Black AI</label>
+      <select id="sel-ai-black">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+
     <div class="control-group" id="group-color">
       <label>Play As</label>
       <select id="sel-color">
         <option value="white">White</option>
         <option value="black">Black</option>
       </select>
+    </div>
+
+    <div class="control-group hidden" id="group-search-iters">
+      <label>AI Strength</label>
+      <select id="sel-search-iters">
+        <option value="16">Fast (16 iter)</option>
+        <option value="32" selected>Normal (32 iter)</option>
+        <option value="64">Strong (64 iter)</option>
+        <option value="128">Expert (128 iter)</option>
+      </select>
+    </div>
+
+    <div class="control-group hidden" id="group-speed">
+      <label>Speed</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="range" id="slider-speed" min="0" max="3000" value="1500" step="100"
+          style="flex:1;accent-color:#4a6cf7;height:6px;">
+        <span id="speed-label" style="font-size:11px;color:#d4d8e8;font-family:'SF Mono',monospace;min-width:36px;text-align:right;">1.5s</span>
+      </div>
     </div>
 
     <div class="control-group">
@@ -309,8 +806,26 @@
         Move History
       </label>
       <div id="move-history"></div>
+      <div id="move-position"></div>
+      <div id="move-nav">
+        <button id="nav-first" title="First move (Home)">|&#9664;</button>
+        <button id="nav-prev" title="Previous move (←)">&#9664;</button>
+        <button id="nav-pause" title="Pause / Resume (Space)">&#9646;&#9646;</button>
+        <button id="nav-next" title="Next move (→)">&#9654;</button>
+        <button id="nav-last" title="Live / Latest (End)" class="live-active">&#9654;|</button>
+      </div>
     </div>
   </div>
+
+  <!-- Removal phase button -->
+  <button id="btn-done-removing" class="glass hidden"
+    style="position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:10;
+           padding:10px 24px;border:1px solid rgba(81,207,102,0.4);border-radius:8px;
+           background:rgba(81,207,102,0.15);color:#51cf66;font-size:13px;
+           font-weight:600;letter-spacing:0.5px;cursor:pointer;
+           transition:background 0.2s,transform 0.15s;pointer-events:auto;">
+    Done Removing
+  </button>
 
   <!-- Status bar -->
   <div id="status-bar" class="glass">Ready</div>

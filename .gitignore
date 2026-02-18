@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+wandb/
+
+# Checkpoints (large binary files)
+engine/checkpoints/
+engine/checkpoints_v2/
+engine/checkpoints_v3/
+
+# Training artifacts
+**/training_progress.json
+**/loss_history.jsonl

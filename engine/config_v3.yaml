@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────
+# Pylos AlphaZero Training Config — v3
+#
+# Continues from v2's last checkpoint with MPS-accelerated training.
+# 1M self-play games for deep strategic learning.
+#
+# Run:
+#   caffeinate -dims .venv/bin/python -m engine.train --config engine/config_v3.yaml
+# ─────────────────────────────────────────────────────────────────
+
+training:
+  selfplay_games: 1000000
+  search_iterations: 64
+  batch_size: 128
+  replay_buffer_size: 16384
+  epochs_per_game: 10
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  c_puct: 1.5
+  dirichlet_alpha: 0.3
+  selfplay_batch_size: 0          # 0 = CPU workers (faster for small models), >0 = batched MCTS on MPS/GPU
+
+  min_learning_rate: 0.00001
+  temp_threshold: 15
+
+  # ── Draw limits (end stuck games, no penalty) ──────────────────
+  max_moves: 200
+  repetition_limit: 5
+  move_limit_draw_penalty: 0.0
+  repetition_draw_penalty: 0.0
+
+checkpoints:
+  save_every: 1000
+  eval_games: 50
+  dir: engine/checkpoints_v3
+
+  resume_from: engine/checkpoints_v3/checkpoint_59000.pth
+
+wandb:
+  enabled: false
+  project: pylos-alphazero

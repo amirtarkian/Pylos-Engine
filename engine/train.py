@@ -574,6 +574,7 @@ def main():
                     pbar.update(1)
 
                 _train_batch()
+                model.eval()  # back to eval mode for next self-play batch (BatchNorm)
 
                 if latest_vloss is not None:
                     append_loss_history(ckpt_dir, games_done, latest_vloss, latest_ploss)

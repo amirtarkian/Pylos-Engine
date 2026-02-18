@@ -8,6 +8,7 @@ wandb/
 engine/checkpoints/
 engine/checkpoints_v2/
 engine/checkpoints_v3/
+engine/checkpoints_v4/
 
 # Training artifacts
 **/training_progress.json

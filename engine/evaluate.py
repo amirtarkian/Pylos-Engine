@@ -1,9 +1,10 @@
 """
-Evaluate a Pylos AlphaZero checkpoint against a random agent.
+Evaluate Pylos AlphaZero checkpoints — vs random and vs other models.
 """
 
 import sys
 import os
+import math
 import argparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
@@ -13,7 +14,11 @@ import torch
 from game import PylosGame
 from models import PylosNetwork
 from agents import AlphaZeroAgent
-from mcts import pit
+from mcts import play
+
+
+MAX_EVAL_MOVES = 200  # prevent infinite games during evaluation
+RANDOM_ELO = 1000     # baseline ELO for random agent
 
 
 class RandomAgent:
@@ -28,50 +33,90 @@ class RandomAgent:
         return np.ones(game.action_space, dtype=np.float32) / game.action_space
 
 
-def evaluate_checkpoint(model_path, num_games=50, search_iterations=32):
-    """Evaluate a checkpoint by playing against a RandomAgent.
-
-    The AlphaZero agent alternates between playing first (white) and
-    second (black) across the games.
-
-    Args:
-        model_path: Path to the saved model state dict (.pth file).
-        num_games: Number of games to play.
-        search_iterations: MCTS iterations per move for the AlphaZero agent.
-
-    Returns:
-        Win rate as a float between 0.0 and 1.0.
-    """
-    game = PylosGame()
-    model = PylosNetwork(game.observation_shape, game.action_space)
-    checkpoint = torch.load(model_path, weights_only=True)
+def _load_agent(model_path):
+    """Load a checkpoint into an AlphaZeroAgent on CPU."""
+    game_tmp = PylosGame()
+    model = PylosNetwork(game_tmp.observation_shape, game_tmp.action_space)
+    model.device = torch.device("cpu")
+    model.to(model.device)
+    checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
         model.load_state_dict(checkpoint)
     model.eval()
+    return AlphaZeroAgent(model)
 
-    az_agent = AlphaZeroAgent(model)
-    random_agent = RandomAgent()
 
-    az_kwargs = {"search_iterations": search_iterations}
-    random_kwargs = {"search_iterations": 1}
+def _play_match(agent_a, agent_b, num_games, search_iterations=32, eval_noise=0.15):
+    """Play a match between two agents, returning agent_a's win rate.
 
-    wins = 0
+    Alternates colors each game. Draws count as 0.5 for both.
+    Uses light Dirichlet noise (eval_noise) to break determinism
+    so each game plays out differently.
+    """
+    game = PylosGame()
+    a_kwargs = {"search_iterations": search_iterations, "dirichlet_alpha": eval_noise}
+    b_kwargs = {"search_iterations": search_iterations, "dirichlet_alpha": eval_noise}
+
+    # If agent_b is RandomAgent, give it 1 iteration and no noise
+    if isinstance(agent_b, RandomAgent):
+        b_kwargs = {"search_iterations": 1, "dirichlet_alpha": None}
+
+    score = 0.0
     for i in range(num_games):
         game.reset()
         if i % 2 == 0:
-            # AlphaZero plays as white (player 1)
-            result = pit(game, az_agent, random_agent, az_kwargs, random_kwargs)
-            if result == 1:
-                wins += 1
+            agents = [agent_a, agent_b]
+            kwargs = [a_kwargs, b_kwargs]
+            a_color = 1
         else:
-            # AlphaZero plays as black (player -1)
-            result = pit(game, random_agent, az_agent, random_kwargs, az_kwargs)
-            if result == -1:
-                wins += 1
+            agents = [agent_b, agent_a]
+            kwargs = [b_kwargs, a_kwargs]
+            a_color = -1
 
-    return wins / num_games
+        cur, nxt = 0, 1
+        moves = 0
+        while game.get_result() is None and moves < MAX_EVAL_MOVES:
+            action = play(game, agents[cur], **kwargs[cur])
+            if action is None:
+                break
+            game.step(action)
+            cur, nxt = nxt, cur
+            moves += 1
+
+        result = game.get_result()
+        if result == a_color:
+            score += 1.0
+        elif result is None:
+            score += 0.5  # draw
+
+    return score / num_games
+
+
+def win_rate_to_elo(win_rate, opponent_elo):
+    """Convert a win rate against a rated opponent to an ELO rating."""
+    clamped = max(0.01, min(0.99, win_rate))
+    return opponent_elo + 400 * math.log10(clamped / (1 - clamped))
+
+
+def evaluate_checkpoint(model_path, num_games=50, search_iterations=32):
+    """Evaluate a checkpoint by playing against a RandomAgent.
+
+    Returns win rate as a float between 0.0 and 1.0.
+    """
+    agent = _load_agent(model_path)
+    return _play_match(agent, RandomAgent(), num_games, search_iterations)
+
+
+def evaluate_vs_model(model_path_a, model_path_b, num_games=50, search_iterations=32):
+    """Play two checkpoints against each other.
+
+    Returns model_a's win rate as a float between 0.0 and 1.0.
+    """
+    agent_a = _load_agent(model_path_a)
+    agent_b = _load_agent(model_path_b)
+    return _play_match(agent_a, agent_b, num_games, search_iterations)
 
 
 def assign_label(win_rate):

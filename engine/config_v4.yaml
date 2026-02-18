@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────
+# Pylos AlphaZero Training Config — v4
+#
+# Fresh training with deeper residual network (6 blocks × 256).
+# Trains from scratch — incompatible with v3 checkpoints.
+#
+# Run:
+#   caffeinate -dims .venv/bin/python -m engine.train --config engine/config_v4.yaml
+# ─────────────────────────────────────────────────────────────────
+
+training:
+  selfplay_games: 500000
+  search_iterations: 64
+  batch_size: 256
+  replay_buffer_size: 32768
+  epochs_per_game: 4
+  learning_rate: 0.002
+  weight_decay: 0.0001
+  c_puct: 1.5
+  dirichlet_alpha: 0.3
+  selfplay_batch_size: 0
+
+  min_learning_rate: 0.0001
+  temp_threshold: 15
+
+  # ── Draw limits ──────────────────────────────────────────────
+  max_moves: 200
+  repetition_limit: 5
+  move_limit_draw_penalty: 0.0
+  repetition_draw_penalty: 0.0
+
+checkpoints:
+  save_every: 1000
+  eval_games: 200
+  dir: engine/checkpoints_v4
+
+  # No resume — fresh training with new architecture
+  # resume_from:
+
+wandb:
+  enabled: false
+  project: pylos-alphazero

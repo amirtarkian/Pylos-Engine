@@ -36,7 +36,7 @@ _worker_agent = None
 
 
 def _init_worker(model_state_dict, obs_shape, action_space, hidden=256, num_blocks=6,
-                 value_hidden=64, policy_hidden=128):
+                 value_hidden=64, policy_hidden=128, rich_obs=False):
     """Initialize a worker process with its own model copy on CPU.
 
     Workers do single-inference MCTS where CPU is ~10x faster than MPS
@@ -57,7 +57,7 @@ def _init_worker(model_state_dict, obs_shape, action_space, hidden=256, num_bloc
     model.eval()
 
     from agents import AlphaZeroAgent
-    _worker_agent = AlphaZeroAgent(model)
+    _worker_agent = AlphaZeroAgent(model, rich_obs=rich_obs)
 
 
 def _board_hash(game):
@@ -636,7 +636,8 @@ def main():
                 initializer=_init_worker,
                 initargs=(cpu_state, game.observation_shape, game.action_space,
                           model_cfg.get("hidden", 256), model_cfg.get("num_blocks", 6),
-                          model_cfg.get("value_hidden", 64), model_cfg.get("policy_hidden", 128)),
+                          model_cfg.get("value_hidden", 64), model_cfg.get("policy_hidden", 128),
+                          rich_obs),
             )
 
         pool = _create_pool()

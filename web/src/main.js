@@ -920,10 +920,10 @@ function _populateSelector(selectEl, checkpoints) {
     if (typeof cp === "string") {
       opt.textContent = cp;
     } else {
-      const wr = cp.win_rate_vs_random != null ? `${Math.round(cp.win_rate_vs_random * 100)}%` : "?";
+      const eloStr = cp.elo != null ? `ELO ${cp.elo}` : "?";
       const stepK = cp.step != null ? `${(cp.step / 1000).toFixed(1)}k` : "?";
       const version = cp.version || ((cp.file || "").includes("v2") ? "v2" : "v1");
-      opt.textContent = `${version}-${stepK} — ${wr} WR (${cp.label || "?"})`;
+      opt.textContent = `${version}-${stepK} — ${eloStr} (${cp.label || "?"})`;
     }
     selectEl.appendChild(opt);
   }

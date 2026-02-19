@@ -9,6 +9,8 @@ import sys
 import os
 import json
 import argparse
+import math
+import random
 import time
 import threading
 import multiprocessing as mp
@@ -25,7 +27,7 @@ from tqdm import tqdm
 from game import PylosGame
 from models import PylosNetwork
 from agents import AlphaZeroAgentTrainer
-from evaluate import evaluate_vs_model, assign_label, win_rate_to_elo, RANDOM_ELO
+from evaluate import evaluate_vs_model, RANDOM_ELO
 
 
 # ---------------------------------------------------------------------------
@@ -249,13 +251,54 @@ _manifest_lock = threading.Lock()
 _eval_threads = []  # track active evaluation threads
 
 
-def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path, ckpt_dir):
-    """Background thread: evaluate checkpoint vs previous model only."""
-    try:
-        win_rate_vs_prev = None
-        prev_path = None
-        prev_elo = None
+MAX_EVAL_OPPONENTS = 10  # play against up to this many previous checkpoints
+EVAL_SEARCH_ITERS = 32   # MCTS iterations for evaluation games
 
+
+def _mle_elo(matchups):
+    """Compute ELO via maximum likelihood estimation.
+
+    matchups: list of (opponent_elo, wins, losses)
+    Returns the ELO that maximizes the likelihood of observed results.
+    """
+    lo, hi = 0.0, 3000.0
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        grad = 0.0
+        for opp_elo, wins, losses in matchups:
+            total = wins + losses
+            if total == 0:
+                continue
+            expected = 1.0 / (1.0 + 10 ** ((opp_elo - mid) / 400))
+            grad += (wins - total * expected) * math.log(10) / 400
+        if grad > 0:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 0.5:
+            break
+    return round((lo + hi) / 2)
+
+
+def _elo_label(elo):
+    """Assign a skill label based on ELO rating."""
+    if elo < 1050:
+        return "Baseline"
+    elif elo < 1150:
+        return "Beginner"
+    elif elo < 1300:
+        return "Novice"
+    elif elo < 1500:
+        return "Intermediate"
+    elif elo < 1700:
+        return "Advanced"
+    else:
+        return "Expert"
+
+
+def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path, ckpt_dir):
+    """Background thread: evaluate checkpoint vs random subset of previous models."""
+    try:
         with _manifest_lock:
             if os.path.exists(manifest_path):
                 with open(manifest_path, "r") as f:
@@ -263,35 +306,51 @@ def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path,
             else:
                 manifest = {"checkpoints": []}
 
-            # Skip if already evaluated (e.g. by backfill script)
+            # Skip if already evaluated
             for entry in manifest["checkpoints"]:
                 if entry["step"] == step and entry.get("elo") is not None:
                     print(f"\n  [eval] Step {step}: already evaluated (ELO {entry['elo']}), skipping")
                     return
 
-            # Find the most recent fully-evaluated checkpoint before this one
+            # Collect all previously evaluated checkpoints
             evaluated = [
                 e for e in manifest["checkpoints"]
                 if e["step"] < step and e.get("elo") is not None
             ]
-            if evaluated:
-                prev_entry = max(evaluated, key=lambda e: e["step"])
-                prev_path = os.path.join(ckpt_dir, prev_entry["file"])
-                prev_elo = prev_entry["elo"]
 
-        if prev_path and os.path.isfile(prev_path):
-            win_rate_vs_prev = evaluate_vs_model(
-                filepath, prev_path, num_games=eval_games, search_iterations=32,
-            )
-            elo = round(win_rate_to_elo(win_rate_vs_prev, prev_elo))
-            label = assign_label(win_rate_vs_prev)
-            print(f"\n  [eval] Step {step}: vs prev {win_rate_vs_prev:.2%}, ELO {elo} ({label})")
-        else:
-            # First checkpoint — no previous to compare against, assign baseline
+        if not evaluated:
+            # First checkpoint — assign baseline ELO
             elo = RANDOM_ELO
             label = "Baseline"
-            win_rate_vs_prev = None
             print(f"\n  [eval] Step {step}: baseline ELO {elo} (no previous checkpoint)")
+        else:
+            # Select random opponents (up to MAX_EVAL_OPPONENTS)
+            num_opponents = min(MAX_EVAL_OPPONENTS, len(evaluated))
+            opponents = random.sample(evaluated, num_opponents)
+            games_per_opponent = max(4, eval_games // num_opponents)
+
+            matchups = []
+            details = []
+            for opp in opponents:
+                opp_path = os.path.join(ckpt_dir, opp["file"])
+                if not os.path.isfile(opp_path):
+                    continue
+                wr = evaluate_vs_model(
+                    filepath, opp_path,
+                    num_games=games_per_opponent,
+                    search_iterations=EVAL_SEARCH_ITERS,
+                )
+                wins = wr * games_per_opponent
+                losses = (1.0 - wr) * games_per_opponent
+                matchups.append((opp["elo"], wins, losses))
+                details.append(f"step {opp['step']}({opp['elo']}): {wr:.0%}")
+
+            if matchups:
+                elo = _mle_elo(matchups)
+            else:
+                elo = RANDOM_ELO
+            label = _elo_label(elo)
+            print(f"\n  [eval] Step {step}: ELO {elo} ({label}) — vs [{', '.join(details)}]")
 
         # Update manifest
         with _manifest_lock:
@@ -305,8 +364,6 @@ def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path,
                 if entry["step"] == step:
                     entry["label"] = label
                     entry["elo"] = elo
-                    if win_rate_vs_prev is not None:
-                        entry["win_rate_vs_prev"] = round(win_rate_vs_prev, 4)
                     break
 
             with open(manifest_path, "w") as f:
@@ -358,7 +415,6 @@ def save_checkpoint(agent, step, config, manifest_path):
             {
                 "file": filename,
                 "step": step,
-                "win_rate_vs_random": None,
                 "label": "Evaluating...",
                 "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }

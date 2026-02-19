@@ -7,6 +7,8 @@
  *   updateBoard(board, legalMoves)    -- sync 3D objects with game state
  *   highlightSphere(level, row, col)  -- green glow on a sphere (raise selection)
  *   clearHighlights()                 -- remove all sphere highlights
+ *   flashFormation(positions, durationMs) -- flash orange glow on formation spheres
+ *   flashAndRemove(positions, holdMs, fadeMs) -- flash green then shrink/fade (AI removal)
  */
 
 import * as THREE from "three";
@@ -19,6 +21,8 @@ let raycaster, mouse;
 let positionMarkers = [];   // { mesh, level, row, col }
 let sphereMeshes = [];      // { mesh, level, row, col, player }
 let animatingMeshes = [];   // { mesh, startY, endY, startTime, duration }
+let flashingMeshes = [];    // { mesh, entry, startTime, phase, duration }
+let formationFlashing = []; // { entry, startTime, durationMs }
 let onPositionClick = null;
 let onSphereClick = null;
 
@@ -313,6 +317,127 @@ export function clearHighlights() {
   }
 }
 
+/**
+ * Flash formation spheres with an orange glow that pulses then fades.
+ *
+ * @param {Array} positions   - Array of {level, row, col} forming the pattern
+ * @param {number} durationMs - How long the orange flash lasts (ms)
+ * @returns {Promise} resolves when the flash animation is done
+ */
+export function flashFormation(positions, durationMs = 800) {
+  return new Promise((resolve) => {
+    if (!positions || positions.length === 0) {
+      resolve();
+      return;
+    }
+
+    const now = performance.now();
+    const matched = [];
+
+    for (const pos of positions) {
+      for (const entry of sphereMeshes) {
+        if (entry.level === pos.level && entry.row === pos.row && entry.col === pos.col) {
+          // Store original material colors so we can restore them
+          entry._origColor = entry.mesh.material.color.getHex();
+          entry._origEmissive = entry.mesh.material.emissive.getHex();
+          entry._origEmissiveIntensity = entry.mesh.material.emissiveIntensity;
+
+          // Set orange glow
+          entry.mesh.material.emissive = new THREE.Color(0xff8c00);
+          entry.mesh.material.emissiveIntensity = 0.7;
+
+          matched.push(entry);
+          formationFlashing.push({
+            entry,
+            startTime: now,
+            durationMs,
+          });
+          break;
+        }
+      }
+    }
+
+    if (matched.length === 0) {
+      resolve();
+      return;
+    }
+
+    setTimeout(() => {
+      // Restore original material state
+      for (const entry of matched) {
+        entry.mesh.material.emissive = new THREE.Color(entry._origEmissive ?? 0x000000);
+        entry.mesh.material.emissiveIntensity = entry._origEmissiveIntensity ?? 0;
+        delete entry._origColor;
+        delete entry._origEmissive;
+        delete entry._origEmissiveIntensity;
+      }
+      resolve();
+    }, durationMs);
+  });
+}
+
+/**
+ * Flash spheres green, then shrink and fade them away.
+ * Used to visualize AI piece removal.
+ *
+ * @param {Array} positions - Array of {level, row, col} to flash and remove
+ * @param {number} holdMs   - How long to hold the green glow (ms)
+ * @param {number} fadeMs   - How long the shrink/fade animation takes (ms)
+ * @returns {Promise} resolves when the full animation is done
+ */
+export function flashAndRemove(positions, holdMs = 1200, fadeMs = 600) {
+  return new Promise((resolve) => {
+    const now = performance.now();
+    let count = 0;
+
+    for (const pos of positions) {
+      for (const entry of sphereMeshes) {
+        if (entry.level === pos.level && entry.row === pos.row && entry.col === pos.col) {
+          // Immediately turn green
+          entry.mesh.material.emissive = new THREE.Color(0x44ff44);
+          entry.mesh.material.emissiveIntensity = 0.8;
+          entry.mesh.material.color.setHex(0x44ff44);
+
+          count++;
+          flashingMeshes.push({
+            mesh: entry.mesh,
+            entry,
+            startTime: now,
+            holdMs,
+            fadeMs,
+            originalScale: entry.mesh.scale.x,
+          });
+          break;
+        }
+      }
+    }
+
+    if (count === 0) {
+      resolve();
+      return;
+    }
+
+    // Resolve when the last animation finishes
+    const totalMs = holdMs + fadeMs;
+    setTimeout(() => {
+      // Clean up: remove the meshes from sphereMeshes and scene
+      for (const pos of positions) {
+        for (let i = sphereMeshes.length - 1; i >= 0; i--) {
+          const e = sphereMeshes[i];
+          if (e.level === pos.level && e.row === pos.row && e.col === pos.col) {
+            scene.remove(e.mesh);
+            e.mesh.geometry.dispose();
+            e.mesh.material.dispose();
+            sphereMeshes.splice(i, 1);
+            break;
+          }
+        }
+      }
+      resolve();
+    }, totalMs + 50);
+  });
+}
+
 // ── Internal helpers ─────────────────────────────────────────────
 
 /**
@@ -410,6 +535,43 @@ function _animate() {
     if (t >= 1) {
       anim.mesh.position.y = anim.endY;
       animatingMeshes.splice(i, 1);
+    }
+  }
+
+  // Process flash-and-remove animations
+  for (let i = flashingMeshes.length - 1; i >= 0; i--) {
+    const f = flashingMeshes[i];
+    const elapsed = now - f.startTime;
+
+    if (elapsed < f.holdMs) {
+      // Hold phase: pulse the green glow
+      const pulse = 0.6 + 0.4 * Math.sin((elapsed / f.holdMs) * Math.PI * 4);
+      f.mesh.material.emissiveIntensity = pulse;
+    } else {
+      // Fade phase: shrink and fade out
+      const fadeElapsed = elapsed - f.holdMs;
+      const t = Math.min(fadeElapsed / f.fadeMs, 1);
+      const scale = f.originalScale * (1 - t);
+      f.mesh.scale.set(scale, scale, scale);
+      f.mesh.material.opacity = 1 - t;
+      f.mesh.material.transparent = true;
+    }
+
+    if (elapsed >= f.holdMs + f.fadeMs) {
+      flashingMeshes.splice(i, 1);
+    }
+  }
+
+  // Process formation flash animations (orange pulse)
+  for (let i = formationFlashing.length - 1; i >= 0; i--) {
+    const f = formationFlashing[i];
+    const elapsed = now - f.startTime;
+    if (elapsed < f.durationMs) {
+      // Pulse the orange glow: 3 quick pulses over the duration
+      const pulse = 0.4 + 0.6 * Math.abs(Math.sin((elapsed / f.durationMs) * Math.PI * 3));
+      f.entry.mesh.material.emissiveIntensity = pulse;
+    } else {
+      formationFlashing.splice(i, 1);
     }
   }
 

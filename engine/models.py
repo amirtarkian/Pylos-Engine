@@ -23,7 +23,7 @@ class ResidualBlock(nn.Module):
 
 
 class PylosNetwork(nn.Module):
-    def __init__(self, input_shape, action_space, hidden=256, num_blocks=6):
+    def __init__(self, input_shape, action_space, hidden=256, num_blocks=6, value_hidden=64, policy_hidden=128):
         super().__init__()
 
         # Input projection
@@ -34,14 +34,14 @@ class PylosNetwork(nn.Module):
         self.blocks = nn.ModuleList([ResidualBlock(hidden) for _ in range(num_blocks)])
 
         # Value head
-        self.value_fc1 = nn.Linear(hidden, 64)
-        self.value_bn = nn.BatchNorm1d(64)
-        self.value_fc2 = nn.Linear(64, 1)
+        self.value_fc1 = nn.Linear(hidden, value_hidden)
+        self.value_bn = nn.BatchNorm1d(value_hidden)
+        self.value_fc2 = nn.Linear(value_hidden, 1)
 
         # Policy head
-        self.policy_fc1 = nn.Linear(hidden, 128)
-        self.policy_bn = nn.BatchNorm1d(128)
-        self.policy_fc2 = nn.Linear(128, action_space)
+        self.policy_fc1 = nn.Linear(hidden, policy_hidden)
+        self.policy_bn = nn.BatchNorm1d(policy_hidden)
+        self.policy_fc2 = nn.Linear(policy_hidden, action_space)
 
         # Device selection
         if torch.cuda.is_available():

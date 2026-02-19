@@ -31,7 +31,9 @@ LEVEL_SIZES = [4, 3, 2, 1]
 class PylosGame:
     """Pylos game engine compatible with AlphaZero MCTS framework."""
 
-    def __init__(self):
+    def __init__(self, rich_obs=False):
+        self._rich_obs = rich_obs
+
         # Pre-compute position mappings
         self.index_to_coords = []  # index -> (level, row, col)
         self.coords_to_index = {}  # (level, row, col) -> index
@@ -64,7 +66,7 @@ class PylosGame:
             self.raise_action_to_pair[30 + i] = pair
 
         self.action_space = 303
-        self.observation_shape = (32,)
+        self.observation_shape = (92,) if rich_obs else (32,)
 
         # Initialize game state
         self.reset()
@@ -85,6 +87,11 @@ class PylosGame:
         self.reserves = {1: 15, -1: 15}
         self.last_move = None  # (level, row, col) of the last placed/raised piece
         self.actions_stack = []  # stack for undo
+
+        # Interactive removal phase state
+        self.pending_removal = False  # waiting for removal choices
+        self.removal_count = 0       # pieces removed so far (max 2)
+        self.removal_player = 0      # which player is removing (1 or -1)
 
     # ------------------------------------------------------------------
     # Board queries
@@ -203,6 +210,77 @@ class PylosGame:
             return False
         level, r, c = self.last_move
         return self.check_square(level, r, c) or self.check_line(level, r, c)
+
+    def get_formation_positions(self):
+        """Return the positions forming the completed pattern from the last move.
+
+        Returns a list of (level, row, col) tuples, or empty list if no formation.
+        """
+        if self.last_move is None:
+            return []
+        level, r, c = self.last_move
+        positions = []
+
+        # Check squares
+        board_level = self.board[level]
+        size = LEVEL_SIZES[level]
+        color = board_level[r, c]
+        if color != 0:
+            for sr in range(max(0, r - 1), min(size - 2, r) + 1):
+                for sc in range(max(0, c - 1), min(size - 2, c) + 1):
+                    if (
+                        board_level[sr, sc] == color
+                        and board_level[sr + 1, sc] == color
+                        and board_level[sr, sc + 1] == color
+                        and board_level[sr + 1, sc + 1] == color
+                    ):
+                        for dr in range(2):
+                            for dc in range(2):
+                                pos = (level, sr + dr, sc + dc)
+                                if pos not in positions:
+                                    positions.append(pos)
+
+        # Check lines
+        if level == 0:
+            positions.extend(self._get_line_positions(level, r, c, 4))
+        elif level == 1:
+            positions.extend(self._get_line_positions(level, r, c, 3))
+
+        # Deduplicate while preserving order
+        seen = set()
+        unique = []
+        for p in positions:
+            if p not in seen:
+                seen.add(p)
+                unique.append(p)
+        return unique
+
+    def _get_line_positions(self, level, r, c, n):
+        """Return positions forming an n-in-a-row on the given level."""
+        board_level = self.board[level]
+        size = LEVEL_SIZES[level]
+        color = board_level[r, c]
+        if color == 0:
+            return []
+        positions = []
+
+        # Check row (horizontal)
+        if size >= n:
+            row_vals = board_level[r, :]
+            if int(np.sum(row_vals == color)) >= n:
+                for ci in range(size):
+                    if board_level[r, ci] == color:
+                        positions.append((level, r, ci))
+
+        # Check column (vertical)
+        if size >= n:
+            col_vals = board_level[:, c]
+            if int(np.sum(col_vals == color)) >= n:
+                for ri in range(size):
+                    if board_level[ri, c] == color:
+                        positions.append((level, ri, c))
+
+        return positions
 
     # ------------------------------------------------------------------
     # Removable pieces
@@ -370,21 +448,30 @@ class PylosGame:
     # Step / Undo (AlphaZero interface)
     # ------------------------------------------------------------------
 
-    def step(self, action):
+    def step(self, action, auto_remove=True):
         """Execute an action (placement or raise).
 
-        After the action, checks for formation and does greedy removal.
+        After the action, checks for formation. If auto_remove is True
+        (default, used by MCTS), does greedy removal immediately.
+        If auto_remove is False (server/interactive), sets pending_removal
+        flag instead so removal can be handled interactively.
+
         Pushes state to actions_stack for undo. Switches turn.
         """
+        # Clear any stale removal state from a previous turn
+        self.pending_removal = False
+
         removed = []
+        has_formation = False
+
         if action < 30:
             # Placement action
             level, r, c = self.index_to_coords[action]
             success = self.place(level, r, c)
             if not success:
                 raise ValueError(f"Illegal placement action {action} at ({level},{r},{c})")
-            # Check for formation and do greedy removal
-            if self.check_for_removal():
+            has_formation = self.check_for_removal()
+            if has_formation and auto_remove:
                 removed = self._do_ai_removal()
             self.actions_stack.append(('place', action, level, r, c, removed))
         else:
@@ -397,10 +484,16 @@ class PylosGame:
                 raise ValueError(
                     f"Illegal raise action {action}: ({sl},{sr},{sc})->({dl},{dr},{dc})"
                 )
-            # Check for formation and do greedy removal
-            if self.check_for_removal():
+            has_formation = self.check_for_removal()
+            if has_formation and auto_remove:
                 removed = self._do_ai_removal()
             self.actions_stack.append(('raise', action, src_idx, dst_idx, sl, sr, sc, dl, dr, dc, removed))
+
+        # Set interactive removal state if not auto-removing
+        if has_formation and not auto_remove:
+            self.pending_removal = True
+            self.removal_player = self.turn  # before switching
+            self.removal_count = 0
 
         # Switch turn
         self.turn *= -1
@@ -441,12 +534,94 @@ class PylosGame:
         self.last_move = None
 
     # ------------------------------------------------------------------
+    # Interactive removal phase
+    # ------------------------------------------------------------------
+
+    def get_pending_removable(self):
+        """Get removable pieces for the removal_player during removal phase.
+
+        Returns list of (level, row, col) tuples. Empty if not in removal phase.
+        """
+        if not self.pending_removal:
+            return []
+        removable = []
+        for level in range(4):
+            size = LEVEL_SIZES[level]
+            for r in range(size):
+                for c in range(size):
+                    if (
+                        self.board[level][r, c] == self.removal_player
+                        and not self.piece_has_top(level, r, c)
+                    ):
+                        removable.append((level, r, c))
+        return removable
+
+    def step_removal(self, level, r, c):
+        """Remove one piece during the interactive removal phase.
+
+        Validates the piece belongs to removal_player and is removable.
+        Returns True if successful, False if illegal.
+        Ends removal phase if 2 pieces removed or no more removable.
+        """
+        if not self.pending_removal:
+            return False
+        if self.removal_count >= 2:
+            return False
+        if self.board[level][r, c] != self.removal_player:
+            return False
+        if self.piece_has_top(level, r, c):
+            return False
+
+        self.board[level][r, c] = 0
+        self.reserves[self.removal_player] += 1
+        self.removal_count += 1
+
+        if self.removal_count >= 2 or not self.get_pending_removable():
+            self.pending_removal = False
+
+        return True
+
+    def skip_removal(self):
+        """End the removal phase early (player chooses not to remove more).
+
+        Returns True if there was a pending removal to skip, False otherwise.
+        """
+        if not self.pending_removal:
+            return False
+        self.pending_removal = False
+        return True
+
+    # ------------------------------------------------------------------
     # Win / result
     # ------------------------------------------------------------------
 
     def has_move(self):
-        """Check if current player has any legal moves."""
-        return len(self.get_legal_actions()) > 0
+        """Check if current player has any legal moves (short-circuits on first found)."""
+        # Check placement actions first — fastest to verify
+        if self.reserves[self.turn] > 0:
+            for idx in range(30):
+                level, r, c = self.index_to_coords[idx]
+                if self.board[level][r, c] == 0 and self.is_supported(level, r, c):
+                    return True
+
+        # Check raise actions
+        for action_idx in range(30, 303):
+            src_idx, dst_idx = self.raise_action_to_pair[action_idx]
+            sl, sr, sc = self.index_to_coords[src_idx]
+            dl, dr, dc = self.index_to_coords[dst_idx]
+            if self.board[sl][sr, sc] != self.turn:
+                continue
+            if self.piece_has_top(sl, sr, sc):
+                continue
+            if self.board[dl][dr, dc] != 0:
+                continue
+            self.board[sl][sr, sc] = 0
+            supported = self.is_supported(dl, dr, dc)
+            self.board[sl][sr, sc] = self.turn
+            if supported:
+                return True
+
+        return False
 
     def get_result(self):
         """Get game result.
@@ -488,6 +663,16 @@ class PylosGame:
     def to_observation(self):
         """Convert game state to observation tensor.
 
+        Dispatches to _to_observation_rich (92-dim) or
+        _to_observation_basic (32-dim) based on self._rich_obs.
+        """
+        if self._rich_obs:
+            return self._to_observation_rich()
+        return self._to_observation_basic()
+
+    def _to_observation_basic(self):
+        """Basic 32-dim observation (original format).
+
         Returns float32 array of shape (32,):
           - 30 board cells: +1 for current player, -1 for opponent, 0 for empty
           - reserves[self.turn] / 15
@@ -503,6 +688,38 @@ class PylosGame:
 
         obs[30] = self.reserves[self.turn] / 15.0
         obs[31] = self.reserves[-self.turn] / 15.0
+
+        return obs
+
+    def _to_observation_rich(self):
+        """Rich 92-dim observation with derived features.
+
+        Returns float32 array of shape (92,):
+          Dims  0-29: Board cells (+1 current player, -1 opponent, 0 empty)
+          Dims 30-59: Supported — 1.0 if position is supported from below, 0.0 otherwise
+          Dims 60-89: Free — 1.0 if a piece occupies position AND has no piece above it, 0.0 otherwise
+          Dims 90-91: Current player reserves / 15, Opponent reserves / 15
+        """
+        obs = np.zeros(92, dtype=np.float32)
+
+        for idx in range(30):
+            level, r, c = self.index_to_coords[idx]
+            cell = self.board[level][r, c]
+
+            # Board cell (same encoding as basic)
+            if cell != 0:
+                obs[idx] = float(cell * self.turn)
+
+            # Supported plane
+            if self.is_supported(level, r, c):
+                obs[30 + idx] = 1.0
+
+            # Free plane: occupied AND nothing on top
+            if cell != 0 and not self.piece_has_top(level, r, c):
+                obs[60 + idx] = 1.0
+
+        obs[90] = self.reserves[self.turn] / 15.0
+        obs[91] = self.reserves[-self.turn] / 15.0
 
         return obs
 

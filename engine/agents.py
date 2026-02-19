@@ -25,18 +25,34 @@ class ClassicMCTSAgent:
 
 
 class AlphaZeroAgent:
-    def __init__(self, model):
+    def __init__(self, model, rich_obs=False):
         self.model = model
+        self.model.eval()
+        self._rich_obs = rich_obs
 
     def value_fn(self, game):
+        orig_rich = game._rich_obs
+        game._rich_obs = self._rich_obs
         observation = torch.tensor(game.to_observation(), device=self.model.device, requires_grad=False)
+        game._rich_obs = orig_rich
         value = self.model.value_forward(observation)
         return value.item()
 
     def policy_fn(self, game):
+        orig_rich = game._rich_obs
+        game._rich_obs = self._rich_obs
         observation = torch.tensor(game.to_observation(), device=self.model.device, requires_grad=False)
+        game._rich_obs = orig_rich
         policy = self.model.policy_forward(observation)
         return policy.cpu().numpy()
+
+    def eval_fn(self, game):
+        """Combined value + policy in a single forward pass."""
+        orig_rich = game._rich_obs
+        game._rich_obs = self._rich_obs
+        observation = torch.tensor(game.to_observation(), device=self.model.device, requires_grad=False)
+        game._rich_obs = orig_rich
+        return self.model.inference(observation)
 
 
 class AlphaZeroAgentTrainer(AlphaZeroAgent):

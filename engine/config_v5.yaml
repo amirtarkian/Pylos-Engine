@@ -1,27 +1,35 @@
 # ─────────────────────────────────────────────────────────────────
-# Pylos AlphaZero Training Config — v4
+# Pylos AlphaZero Training Config — v5
 #
-# Fresh training with deeper residual network (6 blocks × 256).
-# Trains from scratch — incompatible with v3 checkpoints.
+# Deeper residual network (10 blocks × 256) with rich 92-dim
+# observations. Fresh training — incompatible with V4 checkpoints.
 #
 # Run:
-#   caffeinate -dims .venv/bin/python -m engine.train --config engine/config_v4.yaml
+#   caffeinate -dims .venv/bin/python -m engine.train --config engine/config_v5.yaml
 # ─────────────────────────────────────────────────────────────────
 
+model:
+  hidden: 256
+  num_blocks: 10
+  value_hidden: 128
+  policy_hidden: 256
+  rich_obs: true
+
 training:
-  selfplay_games: 1000000
+  selfplay_games: 500000
   search_iterations: 64
   batch_size: 256
-  replay_buffer_size: 32768
+  replay_buffer_size: 65536
   epochs_per_game: 4
-  learning_rate: 0.002
+  learning_rate: 0.001
   weight_decay: 0.0001
   c_puct: 1.5
   dirichlet_alpha: 0.3
   selfplay_batch_size: 0
 
-  min_learning_rate: 0.0001
+  min_learning_rate: 0.00005
   temp_threshold: 15
+  max_grad_norm: 1.0
 
   # ── Draw limits ──────────────────────────────────────────────
   max_moves: 200
@@ -32,10 +40,7 @@ training:
 checkpoints:
   save_every: 1000
   eval_games: 40
-  dir: engine/checkpoints_v4
-
-  # No resume — fresh training with new architecture
-  # resume_from:
+  dir: engine/checkpoints_v5
 
 wandb:
   enabled: false

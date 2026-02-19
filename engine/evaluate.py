@@ -34,18 +34,36 @@ class RandomAgent:
 
 
 def _load_agent(model_path):
-    """Load a checkpoint into an AlphaZeroAgent on CPU."""
-    game_tmp = PylosGame()
-    model = PylosNetwork(game_tmp.observation_shape, game_tmp.action_space)
+    """Load a checkpoint into an AlphaZeroAgent on CPU.
+
+    Reads model architecture from checkpoint metadata (V5+).
+    Falls back to V4 defaults for older checkpoints.
+    """
+    checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
+
+    # Read model config from checkpoint, or use V4 defaults
+    model_cfg = checkpoint.get("model_config", {})
+    hidden = model_cfg.get("hidden", 256)
+    num_blocks = model_cfg.get("num_blocks", 6)
+    value_hidden = model_cfg.get("value_hidden", 64)
+    policy_hidden = model_cfg.get("policy_hidden", 128)
+    rich_obs = model_cfg.get("rich_obs", False)
+
+    game_tmp = PylosGame(rich_obs=rich_obs)
+    model = PylosNetwork(
+        game_tmp.observation_shape, game_tmp.action_space,
+        hidden=hidden, num_blocks=num_blocks,
+        value_hidden=value_hidden, policy_hidden=policy_hidden,
+    )
     model.device = torch.device("cpu")
     model.to(model.device)
-    checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
+
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
     else:
         model.load_state_dict(checkpoint)
     model.eval()
-    return AlphaZeroAgent(model)
+    return AlphaZeroAgent(model, rich_obs=rich_obs)
 
 
 def _play_match(agent_a, agent_b, num_games, search_iterations=32, eval_noise=0.15):

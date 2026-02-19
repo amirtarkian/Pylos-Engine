@@ -99,3 +99,32 @@ export async function fetchCheckpoints() {
     return { checkpoints: [] };
   }
 }
+
+/**
+ * Fetch live training status.
+ * @returns {Promise<object>} e.g. { status, current_game, total_games, percent, ... }
+ */
+export async function fetchTrainingStatus() {
+  try {
+    const resp = await fetch("/training/status");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (err) {
+    return { status: "idle" };
+  }
+}
+
+/**
+ * Fetch persistent loss history for all training runs.
+ * @returns {Promise<object>} e.g. { v1: [{step, value_loss, policy_loss}, ...], v2: [...], v3: [...] }
+ */
+export async function fetchLossHistory() {
+  try {
+    const resp = await fetch("/training/loss-history");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (err) {
+    console.error("[network] fetchLossHistory failed:", err);
+    return {};
+  }
+}

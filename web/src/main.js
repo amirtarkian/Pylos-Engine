@@ -5,7 +5,7 @@
  */
 
 import { createEmptyBoard, updateBoardFromState } from "./game.js";
-import { init as initScene, setCallbacks, updateBoard, highlightSphere, clearHighlights, flashAndRemove } from "./scene.js";
+import { init as initScene, setCallbacks, updateBoard, highlightSphere, clearHighlights, flashFormation, flashAndRemove } from "./scene.js";
 import { connect, send, fetchCheckpoints, fetchTrainingStatus, fetchLossHistory } from "./network.js";
 
 // ── State ────────────────────────────────────────────────────────
@@ -559,8 +559,8 @@ function handleMessage(msg) {
     }
 
     case "removal_phase": {
-      removalPhase = true;
       removablePieces = msg.removable || [];
+      const formation = msg.formation || [];
 
       board = updateBoardFromState(board, msg.board);
       legalMoves = []; // No normal moves during removal
@@ -571,17 +571,35 @@ function handleMessage(msg) {
       selectedSphere = null;
       clearHighlights();
 
-      // Highlight removable pieces with a gold/green glow
-      for (const p of removablePieces) {
-        highlightSphere(p.level, p.row, p.col);
+      // Flash the completed formation in orange first, then highlight removable pieces green
+      if (formation.length > 0 && msg.removed_so_far === 0) {
+        setStatus(`${msg.player} completed a pattern!`, "info");
+        flashFormation(formation, 800).then(() => {
+          removalPhase = true;
+          clearHighlights();
+          for (const p of removablePieces) {
+            highlightSphere(p.level, p.row, p.col);
+          }
+          const remaining = msg.max_removals - msg.removed_so_far;
+          setStatus(
+            `${msg.player}: Remove up to ${remaining} piece${remaining > 1 ? "s" : ""}, or click Done`,
+            "info"
+          );
+          if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
+        });
+      } else {
+        // Subsequent removal (after first piece removed) — skip the flash
+        removalPhase = true;
+        for (const p of removablePieces) {
+          highlightSphere(p.level, p.row, p.col);
+        }
+        const remaining = msg.max_removals - msg.removed_so_far;
+        setStatus(
+          `${msg.player}: Remove up to ${remaining} piece${remaining > 1 ? "s" : ""}, or click Done`,
+          "info"
+        );
+        if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
       }
-
-      const remaining = msg.max_removals - msg.removed_so_far;
-      setStatus(
-        `${msg.player}: Remove up to ${remaining} piece${remaining > 1 ? "s" : ""}, or click Done`,
-        "info"
-      );
-      if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
       break;
     }
 
@@ -703,7 +721,7 @@ const checkpointListEl = document.getElementById("checkpoint-list");
 
 // Per-run DOM elements and loss histories
 const trainRuns = {};
-for (const run of ["v1", "v2", "v3", "v4"]) {
+for (const run of ["v1", "v2", "v3", "v4", "v5"]) {
   trainRuns[run] = {
     badge:       document.getElementById(`train-status-badge-${run}`),
     progressTxt: document.getElementById(`train-progress-text-${run}`),
@@ -857,12 +875,13 @@ function updateCheckpointList(checkpoints) {
     entry.className = "ckpt-entry";
 
     const label = cp.label || `Step ${cp.step}`;
-    const wr = cp.win_rate_vs_random != null ? `${Math.round(cp.win_rate_vs_random * 100)}%` : "?";
+    const stat = cp.elo != null ? `ELO ${cp.elo}` :
+                 cp.win_rate_vs_random != null ? `${Math.round(cp.win_rate_vs_random * 100)}%` : "...";
     const ver = cp.version || "v1";
 
     entry.innerHTML = `
       <span class="ckpt-label">${ver.toUpperCase()} ${label} <span style="color:#555a70;">#${cp.step}</span></span>
-      <span class="ckpt-wr">${wr}</span>
+      <span class="ckpt-wr">${stat}</span>
       <button class="ckpt-play-btn" data-file="${cp.file}">Play</button>
     `;
 
@@ -958,10 +977,11 @@ function drawEloChart(checkpoints) {
 
   ctx.clearRect(0, 0, w, h);
 
-  // Split by version — use precomputed ELO from manifest, fallback to winRateToElo
+  // Split by version — only include checkpoints with a known ELO
   const seriesMap = {};
   for (const cp of checkpoints) {
-    const elo = cp.elo != null ? cp.elo : winRateToElo(cp.win_rate_vs_random ?? 0.5);
+    if (cp.elo == null && cp.win_rate_vs_random == null) continue;
+    const elo = cp.elo != null ? cp.elo : winRateToElo(cp.win_rate_vs_random);
     const ver = cp.version || "v1";
     if (!seriesMap[ver]) seriesMap[ver] = [];
     seriesMap[ver].push({ step: cp.step, elo });
@@ -1050,7 +1070,7 @@ function drawEloChart(checkpoints) {
     ctx.fill();
   }
 
-  const seriesColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040" };
+  const seriesColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040", v5: "#a855f7" };
   for (const [ver, points] of Object.entries(seriesMap)) {
     drawSeries(points, seriesColors[ver] || "#aaa");
   }

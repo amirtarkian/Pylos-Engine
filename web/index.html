@@ -579,6 +579,45 @@
   <div id="training-panel" class="glass hidden">
     <h2>Training</h2>
 
+    <!-- Active training: v5 -->
+    <div class="train-run-panel active" id="train-run-v5">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a82a0;font-weight:600;">V5 — Deeper ResNet + Rich Obs</label>
+        <span id="train-status-badge-v5" class="train-status idle">IDLE</span>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+          <span id="train-progress-text-v5" style="color:#7a82a0;">0 / 0 games</span>
+          <span id="train-percent-v5" style="color:#d4d8e8;font-weight:600;">0%</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="train-progress-bar-v5" style="background:linear-gradient(90deg, #a855f7, #7c3aed);"></div>
+        </div>
+      </div>
+
+      <div class="train-stats">
+        <div class="train-stat">
+          <span class="stat-label">Value Loss</span>
+          <span class="stat-value" id="train-vloss-v5">—</span>
+        </div>
+        <div class="train-stat">
+          <span class="stat-label">Policy Loss</span>
+          <span class="stat-value" id="train-ploss-v5">—</span>
+        </div>
+        <div class="train-stat">
+          <span class="stat-label">Speed</span>
+          <span class="stat-value" id="train-speed-v5">—</span>
+        </div>
+        <div class="train-stat">
+          <span class="stat-label">ETA</span>
+          <span class="stat-value" id="train-eta-v5">—</span>
+        </div>
+      </div>
+
+      <canvas id="loss-chart-v5" class="loss-chart-canvas"></canvas>
+    </div>
+
     <!-- Active training: v4 -->
     <div class="train-run-panel active" id="train-run-v4">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">

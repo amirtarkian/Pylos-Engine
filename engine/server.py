@@ -57,6 +57,7 @@ CHECKPOINTS_DIR = os.path.join(ENGINE_DIR, "checkpoints")
 CHECKPOINTS_V2_DIR = os.path.join(ENGINE_DIR, "checkpoints_v2")
 CHECKPOINTS_V3_DIR = os.path.join(ENGINE_DIR, "checkpoints_v3")
 CHECKPOINTS_V4_DIR = os.path.join(ENGINE_DIR, "checkpoints_v4")
+CHECKPOINTS_V5_DIR = os.path.join(ENGINE_DIR, "checkpoints_v5")
 
 # All training runs: (label, directory)
 TRAINING_RUNS = [
@@ -64,6 +65,7 @@ TRAINING_RUNS = [
     ("v2", CHECKPOINTS_V2_DIR),
     ("v3", CHECKPOINTS_V3_DIR),
     ("v4", CHECKPOINTS_V4_DIR),
+    ("v5", CHECKPOINTS_V5_DIR),
 ]
 
 # ---------------------------------------------------------------------------
@@ -152,7 +154,8 @@ async def get_training_status():
 
 @app.get("/training/loss-history")
 async def get_loss_history():
-    """Return persistent loss history for all training runs."""
+    """Return persistent loss history for all training runs, downsampled for charts."""
+    max_points = 500  # enough for chart resolution
     result = {}
     for label, ckpt_dir in TRAINING_RUNS:
         history_path = os.path.join(ckpt_dir, "loss_history.jsonl")
@@ -166,6 +169,12 @@ async def get_loss_history():
                             entries.append(json.loads(line))
                         except json.JSONDecodeError:
                             continue
+        # Downsample if too many points
+        if len(entries) > max_points:
+            step = len(entries) / max_points
+            sampled = [entries[int(i * step)] for i in range(max_points - 1)]
+            sampled.append(entries[-1])  # always include latest
+            entries = sampled
         result[label] = entries
     return result
 
@@ -301,6 +310,10 @@ def make_removal_msg(game: PylosGame) -> dict:
         "removable": [
             {"level": l, "row": r, "col": c}
             for l, r, c in game.get_pending_removable()
+        ],
+        "formation": [
+            {"level": l, "row": r, "col": c}
+            for l, r, c in game.get_formation_positions()
         ],
         "removed_so_far": game.removal_count,
         "max_removals": 2,

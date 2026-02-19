@@ -35,7 +35,8 @@ from evaluate import evaluate_vs_model, assign_label, win_rate_to_elo, RANDOM_EL
 _worker_agent = None
 
 
-def _init_worker(model_state_dict, obs_shape, action_space):
+def _init_worker(model_state_dict, obs_shape, action_space, hidden=256, num_blocks=6,
+                 value_hidden=64, policy_hidden=128):
     """Initialize a worker process with its own model copy on CPU.
 
     Workers do single-inference MCTS where CPU is ~10x faster than MPS
@@ -46,7 +47,9 @@ def _init_worker(model_state_dict, obs_shape, action_space):
     # Limit PyTorch threads per worker to avoid oversubscription
     torch.set_num_threads(1)
 
-    model = PylosNetwork(obs_shape, action_space)
+    model = PylosNetwork(obs_shape, action_space, hidden=hidden,
+                         num_blocks=num_blocks, value_hidden=value_hidden,
+                         policy_hidden=policy_hidden)
     # Force CPU for workers regardless of what PylosNetwork auto-detects
     model.device = torch.device("cpu")
     model.to(model.device)
@@ -67,7 +70,8 @@ def _board_hash(game):
 
 
 def _batched_selfplay(model, batch_size, search_iters, c_puct, dir_alpha,
-                      max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold=15):
+                      max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold=15,
+                      rich_obs=False):
     """Run a batch of self-play games with batched MCTS on GPU/MPS.
 
     All games run concurrently: at each MCTS iteration, leaf evaluations
@@ -79,7 +83,7 @@ def _batched_selfplay(model, batch_size, search_iters, c_puct, dir_alpha,
     from mcts import batched_search
     from collections import defaultdict
 
-    games = [PylosGame() for _ in range(batch_size)]
+    games = [PylosGame(rich_obs=rich_obs) for _ in range(batch_size)]
     buffers = [[] for _ in range(batch_size)]
     move_counts = [0] * batch_size
     state_counts = [defaultdict(int) if rep_limit else None for _ in range(batch_size)]
@@ -158,11 +162,11 @@ def _run_selfplay(args):
       move_limit_penalty   -- penalty for both players on move limit draw
       repetition_penalty   -- penalty for repeating player on repetition draw
     """
-    search_iters, c_puct, dir_alpha, max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold = args
+    search_iters, c_puct, dir_alpha, max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold, rich_obs = args
     from mcts import search
     from collections import defaultdict
 
-    game = PylosGame()
+    game = PylosGame(rich_obs=rich_obs)
     buffer = []
     move_count = 0
     state_counts = defaultdict(int) if rep_limit else None
@@ -259,6 +263,12 @@ def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path,
             else:
                 manifest = {"checkpoints": []}
 
+            # Skip if already evaluated (e.g. by backfill script)
+            for entry in manifest["checkpoints"]:
+                if entry["step"] == step and entry.get("elo") is not None:
+                    print(f"\n  [eval] Step {step}: already evaluated (ELO {entry['elo']}), skipping")
+                    return
+
             # Find the most recent fully-evaluated checkpoint before this one
             evaluated = [
                 e for e in manifest["checkpoints"]
@@ -313,11 +323,19 @@ def save_checkpoint(agent, step, config, manifest_path):
     filename = f"checkpoint_{step:05d}.pth"
     filepath = os.path.join(ckpt_dir, filename)
 
+    model_cfg = config.get("model", {})
     torch.save(
         {
             "model_state_dict": agent.model.state_dict(),
             "optimizer_state_dict": agent.optimizer.state_dict(),
             "step": step,
+            "model_config": {
+                "hidden": model_cfg.get("hidden", 256),
+                "num_blocks": model_cfg.get("num_blocks", 6),
+                "value_hidden": model_cfg.get("value_hidden", 64),
+                "policy_hidden": model_cfg.get("policy_hidden", 128),
+                "rich_obs": model_cfg.get("rich_obs", False),
+            },
         },
         filepath,
     )
@@ -434,8 +452,16 @@ def main():
         )
 
     # Create game, model, optimizer, agent
-    game = PylosGame()
-    model = PylosNetwork(game.observation_shape, game.action_space)
+    model_cfg = config.get("model", {})
+    rich_obs = model_cfg.get("rich_obs", False)
+    game = PylosGame(rich_obs=rich_obs)
+    model = PylosNetwork(
+        game.observation_shape, game.action_space,
+        hidden=model_cfg.get("hidden", 256),
+        num_blocks=model_cfg.get("num_blocks", 6),
+        value_hidden=model_cfg.get("value_hidden", 64),
+        policy_hidden=model_cfg.get("policy_hidden", 128),
+    )
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=train_cfg["learning_rate"],
@@ -485,6 +511,7 @@ def main():
     rep_penalty = train_cfg.get("repetition_draw_penalty", 0.0)
 
     temp_threshold = train_cfg.get("temp_threshold", 15)
+    max_grad_norm = train_cfg.get("max_grad_norm", 0)  # 0 = disabled
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
@@ -546,6 +573,8 @@ def main():
             vloss = F.mse_loss(values.squeeze(1), results_t)
             ploss = F.kl_div(log_policies, actions_dist, reduction="batchmean")
             (vloss + ploss).backward()
+            if max_grad_norm > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             optimizer.step()
 
             value_losses.append(vloss.item())
@@ -566,6 +595,7 @@ def main():
                 batch_results = _batched_selfplay(
                     model, remaining, search_iters, c_puct, dir_alpha,
                     max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold,
+                    rich_obs=rich_obs,
                 )
 
                 for buffer, fpr in batch_results:
@@ -604,7 +634,9 @@ def main():
             return mp.Pool(
                 num_workers,
                 initializer=_init_worker,
-                initargs=(cpu_state, game.observation_shape, game.action_space),
+                initargs=(cpu_state, game.observation_shape, game.action_space,
+                          model_cfg.get("hidden", 256), model_cfg.get("num_blocks", 6),
+                          model_cfg.get("value_hidden", 64), model_cfg.get("policy_hidden", 128)),
             )
 
         pool = _create_pool()
@@ -615,7 +647,7 @@ def main():
         try:
             while games_done < num_games:
                 remaining = num_games - games_done
-                args_iter = ((search_iters, c_puct, dir_alpha, max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold) for _ in range(remaining))
+                args_iter = ((search_iters, c_puct, dir_alpha, max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold, rich_obs) for _ in range(remaining))
                 games_since_train = 0
 
                 for buffer, fpr in pool.imap_unordered(_run_selfplay, args_iter):

@@ -1,0 +1,14 @@
+services:
+  train:
+    build: .
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./checkpoints:/app/checkpoints
+    environment:
+      - DASHBOARD_URL=${DASHBOARD_URL:-}

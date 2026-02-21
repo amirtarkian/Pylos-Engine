@@ -39,7 +39,7 @@ training:
 
 checkpoints:
   save_every: 1000
-  eval_games: 60
+  eval_games: 200
   dir: engine/checkpoints_v5
   resume_from: engine/checkpoints_v5/checkpoint_14000.pth
 

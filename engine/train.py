@@ -568,6 +568,7 @@ def main():
 
     temp_threshold = train_cfg.get("temp_threshold", 15)
     max_grad_norm = train_cfg.get("max_grad_norm", 0)  # 0 = disabled
+    value_loss_weight = train_cfg.get("value_loss_weight", 1.0)
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
@@ -628,7 +629,7 @@ def main():
             values, log_policies = model(observations)
             vloss = F.mse_loss(values.squeeze(1), results_t)
             ploss = F.kl_div(log_policies, actions_dist, reduction="batchmean")
-            (vloss + ploss).backward()
+            (value_loss_weight * vloss + ploss).backward()
             if max_grad_norm > 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             optimizer.step()

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pylos — Training Dashboard</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    /* ── Shared glassmorphism panel ────────────────────────────── */
+    .glass {
+      background: rgba(20, 20, 45, 0.65);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────── */
+    .dashboard {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 16px;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    /* ── Header: status + progress ────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 16px 24px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b0b8d0;
+      white-space: nowrap;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      white-space: nowrap;
+    }
+
+    .status-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-badge[data-state="idle"] {
+      background: rgba(120, 120, 140, 0.2);
+      color: #8a90a8;
+    }
+    .status-badge[data-state="idle"] .dot {
+      background: #8a90a8;
+    }
+
+    .status-badge[data-state="training"] {
+      background: rgba(74, 108, 247, 0.2);
+      color: #8fa4ff;
+    }
+    .status-badge[data-state="training"] .dot {
+      background: #4a6cf7;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .status-badge[data-state="complete"] {
+      background: rgba(81, 207, 102, 0.2);
+      color: #51cf66;
+    }
+    .status-badge[data-state="complete"] .dot {
+      background: #51cf66;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .progress-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #4a6cf7, #6a3de8);
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    .progress-pct {
+      font-size: 14px;
+      font-weight: 600;
+      color: #8fa4ff;
+      min-width: 48px;
+      text-align: right;
+    }
+
+    /* ── Charts row ───────────────────────────────────────────── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .chart-panel {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .chart-panel h2 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b0b8d0;
+      margin-bottom: 12px;
+    }
+
+    .chart-container {
+      flex: 1;
+      position: relative;
+      min-height: 280px;
+    }
+
+    /* ── Stats row ────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .stat-card {
+      padding: 16px 20px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7a82a0;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #d4d8e8;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    }
+
+    /* ── SSE status indicator ─────────────────────────────────── */
+    .sse-status {
+      position: fixed;
+      bottom: 12px;
+      right: 16px;
+      font-size: 11px;
+      color: #555a70;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #555a70;
+    }
+
+    .sse-dot.connected {
+      background: #51cf66;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .charts-row {
+        grid-template-columns: 1fr;
+      }
+      .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 500px) {
+      .header {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Header: title, status badge, progress bar -->
+    <div class="header glass">
+      <span class="header-title">Pylos Training</span>
+      <div class="status-badge" id="status-badge" data-state="idle">
+        <span class="dot"></span>
+        <span id="status-text">Idle</span>
+      </div>
+      <div class="progress-wrapper">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+    </div>
+
+    <!-- Charts: loss curves + ELO progression -->
+    <div class="charts-row">
+      <div class="chart-panel glass">
+        <h2>Loss Curves</h2>
+        <div class="chart-container">
+          <canvas id="loss-chart"></canvas>
+        </div>
+      </div>
+      <div class="chart-panel glass">
+        <h2>ELO Progression</h2>
+        <div class="chart-container">
+          <canvas id="elo-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card glass">
+        <div class="stat-label">Games / sec</div>
+        <div class="stat-value" id="stat-gps">—</div>
+      </div>
+      <div class="stat-card glass">
+        <div class="stat-label">Elapsed</div>
+        <div class="stat-value" id="stat-elapsed">—</div>
+      </div>
+      <div class="stat-card glass">
+        <div class="stat-label">ETA</div>
+        <div class="stat-value" id="stat-eta">—</div>
+      </div>
+      <div class="stat-card glass">
+        <div class="stat-label">Current Step</div>
+        <div class="stat-value" id="stat-step">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SSE connection indicator -->
+  <div class="sse-status">
+    <span class="sse-dot" id="sse-dot"></span>
+    <span id="sse-label">Disconnected</span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/src/dashboard.js"></script>
+</body>
+</html>

@@ -251,8 +251,8 @@ _manifest_lock = threading.Lock()
 _eval_threads = []  # track active evaluation threads
 
 
-MAX_EVAL_OPPONENTS = 10  # play against up to this many previous checkpoints
-EVAL_SEARCH_ITERS = 32   # MCTS iterations for evaluation games
+MAX_EVAL_OPPONENTS = 5   # play against up to this many previous checkpoints
+EVAL_SEARCH_ITERS = 64   # MCTS iterations for evaluation games (match training depth)
 
 
 def _mle_elo(matchups):

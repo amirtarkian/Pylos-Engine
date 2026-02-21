@@ -202,26 +202,48 @@ async def training_dashboard():
 # ---------------------------------------------------------------------------
 
 def load_ai_agent(checkpoint_file: str) -> AlphaZeroAgent:
-    """Load a PylosNetwork from a checkpoint file and return an AlphaZeroAgent."""
+    """Load a PylosNetwork from a checkpoint file and return an AlphaZeroAgent.
+
+    Reads model architecture from checkpoint metadata (V5+).
+    Falls back to default architecture for older checkpoints.
+    """
     if "/" in checkpoint_file:
-        # v2 path like "checkpoints_v2/checkpoint_00500.pth"
+        # v2+ path like "checkpoints_v2/checkpoint_00500.pth"
         checkpoint_path = os.path.join(ENGINE_DIR, checkpoint_file)
     else:
         checkpoint_path = os.path.join(CHECKPOINTS_DIR, checkpoint_file)
-    game_tmp = PylosGame()
+
+    checkpoint_data = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+
+    # Handle both formats: raw state_dict or {"model_state_dict": ..., "model_config": ...}
+    if isinstance(checkpoint_data, dict) and "model_state_dict" in checkpoint_data:
+        state_dict = checkpoint_data["model_state_dict"]
+        model_cfg = checkpoint_data.get("model_config", {})
+    else:
+        state_dict = checkpoint_data
+        model_cfg = {}
+
+    # Read model architecture from checkpoint metadata, or use defaults
+    hidden = model_cfg.get("hidden", 256)
+    num_blocks = model_cfg.get("num_blocks", 6)
+    value_hidden = model_cfg.get("value_hidden", 64)
+    policy_hidden = model_cfg.get("policy_hidden", 128)
+    rich_obs = model_cfg.get("rich_obs", False)
+
+    game_tmp = PylosGame(rich_obs=rich_obs)
     model = PylosNetwork(
         input_shape=game_tmp.observation_shape,
         action_space=game_tmp.action_space,
+        hidden=hidden,
+        num_blocks=num_blocks,
+        value_hidden=value_hidden,
+        policy_hidden=policy_hidden,
     )
-    checkpoint_data = torch.load(checkpoint_path, map_location=model.device, weights_only=True)
-    # Handle both formats: raw state_dict or {"model_state_dict": ...}
-    if isinstance(checkpoint_data, dict) and "model_state_dict" in checkpoint_data:
-        state_dict = checkpoint_data["model_state_dict"]
-    else:
-        state_dict = checkpoint_data
+    model.device = torch.device("cpu")
+    model.to(model.device)
     model.load_state_dict(state_dict)
     model.eval()
-    return AlphaZeroAgent(model)
+    return AlphaZeroAgent(model, rich_obs=rich_obs)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────────
+# Pylos AlphaZero Training Config — v2
+#
+# TRAIN THIS AFTER config_50k.yaml finishes.
+# Loads the best checkpoint from the v1 run and continues training.
+# Draw limits end stuck games early (result=0) but no extra penalty —
+# the model learns on its own that winning (+1) beats drawing (0).
+#
+# Run:
+#   python -m engine.train --config engine/config_50k_v2.yaml
+# ─────────────────────────────────────────────────────────────────
+
+training:
+  selfplay_games: 200000
+  search_iterations: 64
+  batch_size: 128
+  replay_buffer_size: 512
+  epochs_per_game: 3
+  learning_rate: 0.0005          # lower LR for fine-tuning on top of v1
+  weight_decay: 0.0001
+  c_puct: 1.5
+  dirichlet_alpha: 0.3
+
+  # ── Draw limits (end stuck games, no penalty) ──────────────────
+  # Max moves per self-play game before declaring a draw (result=0)
+  max_moves: 200
+  # How many times the same board state can repeat before draw (result=0)
+  repetition_limit: 5
+  # No penalties — draws are just 0.0 (neutral), wins are +1
+  move_limit_draw_penalty: 0.0
+  repetition_draw_penalty: 0.0
+
+checkpoints:
+  save_every: 500
+  eval_games: 50
+  dir: engine/checkpoints_v2     # separate dir so v1 checkpoints are preserved
+
+  # Resume from latest v1 checkpoint
+  resume_from: engine/checkpoints/checkpoint_21500.pth
+
+wandb:
+  enabled: false
+  project: pylos-alphazero

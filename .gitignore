@@ -9,6 +9,7 @@ engine/checkpoints/
 engine/checkpoints_v2/
 engine/checkpoints_v3/
 engine/checkpoints_v4/
+engine/checkpoints_v5/
 
 # Training artifacts
 **/training_progress.json

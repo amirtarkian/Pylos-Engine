@@ -14,6 +14,9 @@ checkpoints:
   eval_games: 50
   dir: engine/checkpoints
 
+dashboard:
+  url: ""  # e.g., http://localhost:8080 — empty means disabled
+
 wandb:
   enabled: false
   project: pylos-alphazero

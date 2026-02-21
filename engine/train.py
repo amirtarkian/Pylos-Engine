@@ -26,6 +26,7 @@ from game import PylosGame
 from models import PylosNetwork
 from agents import AlphaZeroAgentTrainer
 from evaluate import evaluate_vs_model, assign_label, win_rate_to_elo, RANDOM_ELO
+from metrics import MetricsReporter
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +246,8 @@ _manifest_lock = threading.Lock()
 _eval_threads = []  # track active evaluation threads
 
 
-def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path, ckpt_dir):
+def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path, ckpt_dir,
+                             reporter=None):
     """Background thread: evaluate checkpoint vs previous model only."""
     try:
         win_rate_vs_prev = None
@@ -301,11 +303,16 @@ def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path,
 
             with open(manifest_path, "w") as f:
                 json.dump(manifest, f, indent=2)
+
+        # Report checkpoint to dashboard
+        if reporter:
+            reporter.report_checkpoint(filename, step, elo=elo, label=label,
+                                       win_rate=win_rate_vs_prev)
     except Exception as e:
         print(f"\n  [eval] Step {step} evaluation failed: {e}")
 
 
-def save_checkpoint(agent, step, config, manifest_path):
+def save_checkpoint(agent, step, config, manifest_path, reporter=None):
     """Save a training checkpoint and kick off background evaluation."""
     ckpt_dir = config["checkpoints"]["dir"]
     os.makedirs(ckpt_dir, exist_ok=True)
@@ -353,7 +360,7 @@ def save_checkpoint(agent, step, config, manifest_path):
     eval_games = config["checkpoints"]["eval_games"]
     eval_thread = threading.Thread(
         target=_run_eval_in_background,
-        args=(filepath, filename, step, eval_games, manifest_path, ckpt_dir),
+        args=(filepath, filename, step, eval_games, manifest_path, ckpt_dir, reporter),
         daemon=False,  # Changed: don't kill on exit
     )
     eval_thread.start()
@@ -361,50 +368,6 @@ def save_checkpoint(agent, step, config, manifest_path):
     print(f"  Evaluation started in background ({eval_games} games on CPU)")
 
 
-_progress_prev = {}  # path -> (step, time) for rolling speed
-
-
-def write_progress(path, step, total, value_loss, policy_loss, start_time, status="training"):
-    """Write live training progress to a JSON file for the server to read."""
-    now = time.time()
-    elapsed = now - start_time
-
-    # Rolling speed: games since last write / time since last write
-    prev = _progress_prev.get(path)
-    if prev and now > prev[1] and step > prev[0]:
-        recent_rate = (step - prev[0]) / (now - prev[1])
-    else:
-        recent_rate = step / elapsed if elapsed > 0 else 0
-    _progress_prev[path] = (step, now)
-
-    eta = (total - step) / recent_rate if recent_rate > 0 else 0
-
-    progress = {
-        "status": status,
-        "current_game": step,
-        "total_games": total,
-        "percent": round(step / total * 100, 1) if total > 0 else 0,
-        "value_loss": round(value_loss, 6) if value_loss is not None else None,
-        "policy_loss": round(policy_loss, 6) if policy_loss is not None else None,
-        "elapsed_seconds": round(elapsed, 1),
-        "eta_seconds": round(eta, 1),
-        "games_per_second": round(recent_rate, 3),
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-
-    with open(path, "w") as f:
-        json.dump(progress, f, indent=2)
-
-
-def append_loss_history(ckpt_dir, step, value_loss, policy_loss):
-    """Append a single loss data point to the persistent loss history file."""
-    history_path = os.path.join(ckpt_dir, "loss_history.jsonl")
-    with open(history_path, "a") as f:
-        f.write(json.dumps({
-            "step": step,
-            "value_loss": round(value_loss, 6),
-            "policy_loss": round(policy_loss, 6),
-        }) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -469,6 +432,9 @@ def main():
     os.makedirs(ckpt_dir, exist_ok=True)
     manifest_path = os.path.join(ckpt_dir, "manifest.json")
 
+    dashboard_url = config.get("dashboard", {}).get("url", "")
+    reporter = MetricsReporter(ckpt_dir, dashboard_url=dashboard_url)
+
     num_games = train_cfg["selfplay_games"]
     save_every = ckpt_cfg["save_every"]
     search_iters = train_cfg["search_iterations"]
@@ -476,7 +442,6 @@ def main():
     dir_alpha = train_cfg["dirichlet_alpha"]
     batch_size = train_cfg["batch_size"]
     epochs = train_cfg["epochs_per_game"]
-    progress_path = os.path.join(ckpt_dir, "training_progress.json")
 
     # Anti-draw settings (default: disabled for backward compat)
     max_moves = train_cfg.get("max_moves", 0)
@@ -515,7 +480,7 @@ def main():
     games_done = resume_step
 
     # Write initial progress
-    write_progress(progress_path, games_done, num_games, None, None, start_time, status="starting")
+    reporter.report_progress(games_done, num_games, None, None, 0.0, 0.0, status="starting")
 
     pbar = tqdm(total=num_games, desc="Self-play")
 
@@ -576,7 +541,7 @@ def main():
                 _train_batch()
 
                 if latest_vloss is not None:
-                    append_loss_history(ckpt_dir, games_done, latest_vloss, latest_ploss)
+                    reporter.report_loss(games_done, latest_vloss, latest_ploss)
                     tqdm.write(
                         f"Game {games_done}: value_loss={latest_vloss:.4f}  "
                         f"policy_loss={latest_ploss:.4f}"
@@ -588,11 +553,14 @@ def main():
                             "step": games_done,
                         })
 
-                write_progress(progress_path, games_done, num_games,
-                               latest_vloss, latest_ploss, start_time)
+                elapsed = time.time() - start_time
+                rate = games_done / elapsed if elapsed > 0 else 0
+                eta = (num_games - games_done) / rate if rate > 0 else 0
+                reporter.report_progress(games_done, num_games,
+                                         latest_vloss, latest_ploss, elapsed, eta)
 
                 if games_done >= next_save and games_done < num_games:
-                    save_checkpoint(agent, games_done, config, manifest_path)
+                    save_checkpoint(agent, games_done, config, manifest_path, reporter)
                     next_save += save_every
         finally:
             pbar.close()
@@ -629,7 +597,7 @@ def main():
                         games_since_train = 0
 
                         if latest_vloss is not None:
-                            append_loss_history(ckpt_dir, games_done, latest_vloss, latest_ploss)
+                            reporter.report_loss(games_done, latest_vloss, latest_ploss)
                             tqdm.write(
                                 f"Game {games_done}: value_loss={latest_vloss:.4f}  "
                                 f"policy_loss={latest_ploss:.4f}"
@@ -641,15 +609,18 @@ def main():
                                     "step": games_done,
                                 })
 
-                    write_progress(progress_path, games_done, num_games,
-                                   latest_vloss, latest_ploss, start_time)
+                    elapsed = time.time() - start_time
+                    rate = games_done / elapsed if elapsed > 0 else 0
+                    eta = (num_games - games_done) / rate if rate > 0 else 0
+                    reporter.report_progress(games_done, num_games,
+                                             latest_vloss, latest_ploss, elapsed, eta)
 
                     # Checkpoint save
                     if games_done % save_every == 0 and games_done < num_games:
                         if games_since_train > 0:
                             _train_batch()
                             games_since_train = 0
-                        save_checkpoint(agent, games_done, config, manifest_path)
+                        save_checkpoint(agent, games_done, config, manifest_path, reporter)
                         pool.terminate()
                         pool.join()
                         pool = _create_pool()
@@ -674,10 +645,11 @@ def main():
 
     # Final checkpoint (if not already saved)
     if num_games % save_every != 0:
-        save_checkpoint(agent, num_games, config, manifest_path)
+        save_checkpoint(agent, num_games, config, manifest_path, reporter)
 
-    write_progress(progress_path, num_games, num_games,
-                   latest_vloss, latest_ploss, start_time, status="complete")
+    elapsed = time.time() - start_time
+    reporter.report_progress(num_games, num_games,
+                             latest_vloss, latest_ploss, elapsed, 0.0, status="complete")
 
     # Wait for any pending evaluations to finish
     if _eval_threads:

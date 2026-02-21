@@ -12,3 +12,8 @@ engine/checkpoints_v3/
 # Training artifacts
 **/training_progress.json
 **/loss_history.jsonl
+
+# Gas Town (added by gt)
+.runtime/
+.claude/commands/
+.logs/

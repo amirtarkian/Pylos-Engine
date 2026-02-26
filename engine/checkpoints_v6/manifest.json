@@ -1,0 +1,1229 @@
+{
+  "checkpoints": [
+    {
+      "file": "checkpoint_01000.pth",
+      "step": 1000,
+      "label": "Baseline",
+      "timestamp": "2026-02-21T19:53:03Z",
+      "elo": 1000
+    },
+    {
+      "file": "checkpoint_02000.pth",
+      "step": 2000,
+      "label": "Beginner",
+      "timestamp": "2026-02-21T19:58:09Z",
+      "elo": 1096
+    },
+    {
+      "file": "checkpoint_03000.pth",
+      "step": 3000,
+      "label": "Novice",
+      "timestamp": "2026-02-21T20:04:02Z",
+      "elo": 1186
+    },
+    {
+      "file": "checkpoint_04000.pth",
+      "step": 4000,
+      "label": "Novice",
+      "timestamp": "2026-02-21T20:09:28Z",
+      "elo": 1238
+    },
+    {
+      "file": "checkpoint_05000.pth",
+      "step": 5000,
+      "label": "Intermediate",
+      "timestamp": "2026-02-21T20:15:07Z",
+      "elo": 1316
+    },
+    {
+      "file": "checkpoint_06000.pth",
+      "step": 6000,
+      "label": "Intermediate",
+      "timestamp": "2026-02-21T20:21:19Z",
+      "elo": 1348
+    },
+    {
+      "file": "checkpoint_07000.pth",
+      "step": 7000,
+      "label": "Intermediate",
+      "timestamp": "2026-02-21T20:27:36Z",
+      "elo": 1368
+    },
+    {
+      "file": "checkpoint_08000.pth",
+      "step": 8000,
+      "label": "Intermediate",
+      "timestamp": "2026-02-21T20:34:04Z",
+      "elo": 1344
+    },
+    {
+      "file": "checkpoint_09000.pth",
+      "step": 9000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T20:41:07Z",
+      "elo": 1458
+    },
+    {
+      "file": "checkpoint_10000.pth",
+      "step": 10000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T20:49:01Z",
+      "elo": 1464
+    },
+    {
+      "file": "checkpoint_11000.pth",
+      "step": 11000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T20:57:27Z",
+      "elo": 1451
+    },
+    {
+      "file": "checkpoint_12000.pth",
+      "step": 12000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T21:06:32Z",
+      "elo": 1446
+    },
+    {
+      "file": "checkpoint_13000.pth",
+      "step": 13000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T21:15:52Z",
+      "elo": 1487
+    },
+    {
+      "file": "checkpoint_17000.pth",
+      "step": 17000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T22:09:06Z",
+      "elo": 1469
+    },
+    {
+      "file": "checkpoint_18000.pth",
+      "step": 18000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T22:25:47Z",
+      "elo": 1499
+    },
+    {
+      "file": "checkpoint_19000.pth",
+      "step": 19000,
+      "label": "Advanced",
+      "timestamp": "2026-02-21T22:41:38Z",
+      "elo": 1548
+    },
+    {
+      "file": "checkpoint_20000.pth",
+      "step": 20000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T02:08:00Z",
+      "elo": 1540
+    },
+    {
+      "file": "checkpoint_21000.pth",
+      "step": 21000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T04:03:20Z",
+      "elo": 1612
+    },
+    {
+      "file": "checkpoint_22000.pth",
+      "step": 22000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T04:21:21Z",
+      "elo": 1581
+    },
+    {
+      "file": "checkpoint_23000.pth",
+      "step": 23000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T04:40:06Z",
+      "elo": 1617
+    },
+    {
+      "file": "checkpoint_24000.pth",
+      "step": 24000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T04:59:33Z",
+      "elo": 1582
+    },
+    {
+      "file": "checkpoint_25000.pth",
+      "step": 25000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T05:18:06Z",
+      "elo": 1606
+    },
+    {
+      "file": "checkpoint_26000.pth",
+      "step": 26000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T05:38:56Z",
+      "elo": 1595
+    },
+    {
+      "file": "checkpoint_27000.pth",
+      "step": 27000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T08:09:44Z",
+      "elo": 1589
+    },
+    {
+      "file": "checkpoint_28000.pth",
+      "step": 28000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T12:06:03Z",
+      "elo": 1618
+    },
+    {
+      "file": "checkpoint_29000.pth",
+      "step": 29000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T12:28:15Z",
+      "elo": 1667
+    },
+    {
+      "file": "checkpoint_30000.pth",
+      "step": 30000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T12:51:29Z",
+      "elo": 1556
+    },
+    {
+      "file": "checkpoint_31000.pth",
+      "step": 31000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T13:15:22Z",
+      "elo": 1678
+    },
+    {
+      "file": "checkpoint_32000.pth",
+      "step": 32000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T13:40:27Z",
+      "elo": 1652
+    },
+    {
+      "file": "checkpoint_33000.pth",
+      "step": 33000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T14:21:16Z",
+      "elo": 1616
+    },
+    {
+      "file": "checkpoint_34000.pth",
+      "step": 34000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T14:47:11Z",
+      "elo": 1609
+    },
+    {
+      "file": "checkpoint_35000.pth",
+      "step": 35000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T15:12:48Z",
+      "elo": 1605
+    },
+    {
+      "file": "checkpoint_36000.pth",
+      "step": 36000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T15:39:56Z",
+      "elo": 1642
+    },
+    {
+      "file": "checkpoint_39000.pth",
+      "step": 39000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T17:11:17Z",
+      "elo": 1594
+    },
+    {
+      "file": "checkpoint_40000.pth",
+      "step": 40000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T17:41:51Z",
+      "elo": 1664
+    },
+    {
+      "file": "checkpoint_41000.pth",
+      "step": 41000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T18:16:12Z",
+      "elo": 1573
+    },
+    {
+      "file": "checkpoint_42000.pth",
+      "step": 42000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T18:53:39Z",
+      "elo": 1616
+    },
+    {
+      "file": "checkpoint_43000.pth",
+      "step": 43000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T19:22:15Z",
+      "elo": 1607
+    },
+    {
+      "file": "checkpoint_44000.pth",
+      "step": 44000,
+      "label": "Advanced",
+      "timestamp": "2026-02-22T19:52:28Z",
+      "elo": 1560
+    },
+    {
+      "file": "checkpoint_45000.pth",
+      "step": 45000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T20:20:42Z",
+      "elo": 1658
+    },
+    {
+      "file": "checkpoint_46000.pth",
+      "step": 46000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T21:01:57Z",
+      "elo": 1614
+    },
+    {
+      "file": "checkpoint_47000.pth",
+      "step": 47000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T21:41:18Z",
+      "elo": 1634
+    },
+    {
+      "file": "checkpoint_48000.pth",
+      "step": 48000,
+      "label": "Expert",
+      "timestamp": "2026-02-22T23:31:36Z",
+      "elo": 1626
+    },
+    {
+      "file": "checkpoint_49000.pth",
+      "step": 49000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T03:10:06Z",
+      "elo": 1551
+    },
+    {
+      "file": "checkpoint_50000.pth",
+      "step": 50000,
+      "label": "Expert",
+      "timestamp": "2026-02-23T04:04:19Z",
+      "elo": 1624
+    },
+    {
+      "file": "checkpoint_51000.pth",
+      "step": 51000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T04:47:14Z",
+      "elo": 1580
+    },
+    {
+      "file": "checkpoint_52000.pth",
+      "step": 52000,
+      "label": "Expert",
+      "timestamp": "2026-02-23T05:30:21Z",
+      "elo": 1614
+    },
+    {
+      "file": "checkpoint_53000.pth",
+      "step": 53000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T06:14:46Z",
+      "elo": 1565
+    },
+    {
+      "file": "checkpoint_54000.pth",
+      "step": 54000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T07:00:44Z",
+      "elo": 1583
+    },
+    {
+      "file": "checkpoint_55000.pth",
+      "step": 55000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T07:46:45Z",
+      "elo": 1588
+    },
+    {
+      "file": "checkpoint_56000.pth",
+      "step": 56000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T08:31:44Z",
+      "elo": 1562
+    },
+    {
+      "file": "checkpoint_57000.pth",
+      "step": 57000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T09:17:44Z",
+      "elo": 1576
+    },
+    {
+      "file": "checkpoint_58000.pth",
+      "step": 58000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T10:04:00Z",
+      "elo": 1521
+    },
+    {
+      "file": "checkpoint_59000.pth",
+      "step": 59000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T10:51:14Z",
+      "elo": 1536
+    },
+    {
+      "file": "checkpoint_60000.pth",
+      "step": 60000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T11:39:37Z",
+      "elo": 1500
+    },
+    {
+      "file": "checkpoint_61000.pth",
+      "step": 61000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T12:28:49Z",
+      "elo": 1488
+    },
+    {
+      "file": "checkpoint_62000.pth",
+      "step": 62000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T13:18:58Z",
+      "elo": 1542
+    },
+    {
+      "file": "checkpoint_63000.pth",
+      "step": 63000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T14:10:09Z",
+      "elo": 1568
+    },
+    {
+      "file": "checkpoint_64000.pth",
+      "step": 64000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T15:02:06Z",
+      "elo": 1520
+    },
+    {
+      "file": "checkpoint_65000.pth",
+      "step": 65000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T20:25:41Z",
+      "elo": 1571
+    },
+    {
+      "file": "checkpoint_67000.pth",
+      "step": 67000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T22:05:35Z",
+      "elo": 1611
+    },
+    {
+      "file": "checkpoint_68000.pth",
+      "step": 68000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T22:17:16Z",
+      "elo": 1659
+    },
+    {
+      "file": "checkpoint_69000.pth",
+      "step": 69000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T22:28:53Z",
+      "elo": 1676
+    },
+    {
+      "file": "checkpoint_70000.pth",
+      "step": 70000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T22:40:26Z",
+      "elo": 1682
+    },
+    {
+      "file": "checkpoint_71000.pth",
+      "step": 71000,
+      "label": "Expert",
+      "timestamp": "2026-02-23T22:52:49Z",
+      "elo": 1716
+    },
+    {
+      "file": "checkpoint_72000.pth",
+      "step": 72000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T23:03:23Z",
+      "elo": 1529
+    },
+    {
+      "file": "checkpoint_73000.pth",
+      "step": 73000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T23:14:10Z",
+      "elo": 1625
+    },
+    {
+      "file": "checkpoint_74000.pth",
+      "step": 74000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T23:25:29Z",
+      "elo": 1579
+    },
+    {
+      "file": "checkpoint_75000.pth",
+      "step": 75000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T23:36:49Z",
+      "elo": 1669
+    },
+    {
+      "file": "checkpoint_76000.pth",
+      "step": 76000,
+      "label": "Expert",
+      "timestamp": "2026-02-23T23:47:43Z",
+      "elo": 1705
+    },
+    {
+      "file": "checkpoint_77000.pth",
+      "step": 77000,
+      "label": "Advanced",
+      "timestamp": "2026-02-23T23:58:44Z",
+      "elo": 1664
+    },
+    {
+      "file": "checkpoint_78000.pth",
+      "step": 78000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T00:36:48Z",
+      "elo": 1746
+    },
+    {
+      "file": "checkpoint_79000.pth",
+      "step": 79000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T00:48:39Z",
+      "elo": 1629
+    },
+    {
+      "file": "checkpoint_80000.pth",
+      "step": 80000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T01:00:06Z",
+      "elo": 1619
+    },
+    {
+      "file": "checkpoint_81000.pth",
+      "step": 81000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T01:11:32Z",
+      "elo": 1655
+    },
+    {
+      "file": "checkpoint_82000.pth",
+      "step": 82000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T01:22:44Z",
+      "elo": 1737
+    },
+    {
+      "file": "checkpoint_83000.pth",
+      "step": 83000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T01:34:51Z",
+      "elo": 1747
+    },
+    {
+      "file": "checkpoint_84000.pth",
+      "step": 84000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T01:46:10Z",
+      "elo": 1705
+    },
+    {
+      "file": "checkpoint_85000.pth",
+      "step": 85000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T01:57:26Z",
+      "elo": 1660
+    },
+    {
+      "file": "checkpoint_86000.pth",
+      "step": 86000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T02:08:59Z",
+      "elo": 1556
+    },
+    {
+      "file": "checkpoint_87000.pth",
+      "step": 87000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T02:19:56Z",
+      "elo": 1627
+    },
+    {
+      "file": "checkpoint_88000.pth",
+      "step": 88000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T02:30:53Z",
+      "elo": 1656
+    },
+    {
+      "file": "checkpoint_89000.pth",
+      "step": 89000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T02:42:14Z",
+      "elo": 1620
+    },
+    {
+      "file": "checkpoint_90000.pth",
+      "step": 90000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T02:53:05Z",
+      "elo": 1725
+    },
+    {
+      "file": "checkpoint_91000.pth",
+      "step": 91000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T03:03:39Z",
+      "elo": 1654
+    },
+    {
+      "file": "checkpoint_92000.pth",
+      "step": 92000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T03:14:23Z",
+      "elo": 1733
+    },
+    {
+      "file": "checkpoint_93000.pth",
+      "step": 93000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T03:25:02Z",
+      "elo": 1695
+    },
+    {
+      "file": "checkpoint_94000.pth",
+      "step": 94000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T03:35:27Z",
+      "elo": 1649
+    },
+    {
+      "file": "checkpoint_95000.pth",
+      "step": 95000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T03:46:23Z",
+      "elo": 1628
+    },
+    {
+      "file": "checkpoint_96000.pth",
+      "step": 96000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T03:56:59Z",
+      "elo": 1729
+    },
+    {
+      "file": "checkpoint_97000.pth",
+      "step": 97000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T04:07:35Z",
+      "elo": 1675
+    },
+    {
+      "file": "checkpoint_98000.pth",
+      "step": 98000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T04:43:48Z",
+      "elo": 1649
+    },
+    {
+      "file": "checkpoint_99000.pth",
+      "step": 99000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T05:30:55Z",
+      "elo": 1735
+    },
+    {
+      "file": "checkpoint_100000.pth",
+      "step": 100000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T13:54:34Z",
+      "elo": 1744
+    },
+    {
+      "file": "checkpoint_101000.pth",
+      "step": 101000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T16:42:22Z",
+      "elo": 1685
+    },
+    {
+      "file": "checkpoint_102000.pth",
+      "step": 102000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T19:29:26Z",
+      "elo": 1653
+    },
+    {
+      "file": "checkpoint_103000.pth",
+      "step": 103000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T19:41:27Z",
+      "elo": 1655
+    },
+    {
+      "file": "checkpoint_104000.pth",
+      "step": 104000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T19:53:09Z",
+      "elo": 1648
+    },
+    {
+      "file": "checkpoint_105000.pth",
+      "step": 105000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T20:04:39Z",
+      "elo": 1746
+    },
+    {
+      "file": "checkpoint_106000.pth",
+      "step": 106000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T20:15:57Z",
+      "elo": 1676
+    },
+    {
+      "file": "checkpoint_107000.pth",
+      "step": 107000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T20:27:11Z",
+      "elo": 1699
+    },
+    {
+      "file": "checkpoint_108000.pth",
+      "step": 108000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T20:39:47Z",
+      "elo": 1657
+    },
+    {
+      "file": "checkpoint_109000.pth",
+      "step": 109000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T20:52:02Z",
+      "elo": 1729
+    },
+    {
+      "file": "checkpoint_110000.pth",
+      "step": 110000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T21:03:45Z",
+      "elo": 1689
+    },
+    {
+      "file": "checkpoint_111000.pth",
+      "step": 111000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T21:24:25Z",
+      "elo": 1741
+    },
+    {
+      "file": "checkpoint_112000.pth",
+      "step": 112000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T21:41:15Z",
+      "elo": 1719
+    },
+    {
+      "file": "checkpoint_113000.pth",
+      "step": 113000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T21:52:51Z",
+      "elo": 1717
+    },
+    {
+      "file": "checkpoint_114000.pth",
+      "step": 114000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T22:04:35Z",
+      "elo": 1710
+    },
+    {
+      "file": "checkpoint_115000.pth",
+      "step": 115000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T22:15:56Z",
+      "elo": 1744
+    },
+    {
+      "file": "checkpoint_116000.pth",
+      "step": 116000,
+      "label": "Advanced",
+      "timestamp": "2026-02-24T22:27:14Z",
+      "elo": 1643
+    },
+    {
+      "file": "checkpoint_117000.pth",
+      "step": 117000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T22:42:07Z",
+      "elo": 1755
+    },
+    {
+      "file": "checkpoint_118000.pth",
+      "step": 118000,
+      "label": "Expert",
+      "timestamp": "2026-02-24T23:58:18Z",
+      "elo": 1704
+    },
+    {
+      "file": "checkpoint_119000.pth",
+      "step": 119000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T00:08:27Z",
+      "elo": 1746
+    },
+    {
+      "file": "checkpoint_120000.pth",
+      "step": 120000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T00:19:29Z",
+      "elo": 1714
+    },
+    {
+      "file": "checkpoint_121000.pth",
+      "step": 121000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T00:31:21Z",
+      "elo": 1794
+    },
+    {
+      "file": "checkpoint_122000.pth",
+      "step": 122000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T00:43:15Z",
+      "elo": 1702
+    },
+    {
+      "file": "checkpoint_123000.pth",
+      "step": 123000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T00:56:22Z",
+      "elo": 1690
+    },
+    {
+      "file": "checkpoint_124000.pth",
+      "step": 124000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T01:22:15Z",
+      "elo": 1733
+    },
+    {
+      "file": "checkpoint_125000.pth",
+      "step": 125000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T01:53:23Z",
+      "elo": 1775
+    },
+    {
+      "file": "checkpoint_126000.pth",
+      "step": 126000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T03:11:08Z",
+      "elo": 1698
+    },
+    {
+      "file": "checkpoint_127000.pth",
+      "step": 127000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T03:23:01Z",
+      "elo": 1681
+    },
+    {
+      "file": "checkpoint_128000.pth",
+      "step": 128000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T03:34:58Z",
+      "elo": 1613
+    },
+    {
+      "file": "checkpoint_129000.pth",
+      "step": 129000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T03:47:05Z",
+      "elo": 1594
+    },
+    {
+      "file": "checkpoint_130000.pth",
+      "step": 130000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T03:59:07Z",
+      "elo": 1655
+    },
+    {
+      "file": "checkpoint_131000.pth",
+      "step": 131000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T04:11:26Z",
+      "elo": 1651
+    },
+    {
+      "file": "checkpoint_132000.pth",
+      "step": 132000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T04:24:13Z",
+      "elo": 1728
+    },
+    {
+      "file": "checkpoint_133000.pth",
+      "step": 133000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T04:36:21Z",
+      "elo": 1684
+    },
+    {
+      "file": "checkpoint_134000.pth",
+      "step": 134000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T05:04:22Z",
+      "elo": 1743
+    },
+    {
+      "file": "checkpoint_135000.pth",
+      "step": 135000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T05:31:30Z",
+      "elo": 1809
+    },
+    {
+      "file": "checkpoint_136000.pth",
+      "step": 136000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T05:56:21Z",
+      "elo": 1684
+    },
+    {
+      "file": "checkpoint_137000.pth",
+      "step": 137000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T07:23:07Z",
+      "elo": 1718
+    },
+    {
+      "file": "checkpoint_138000.pth",
+      "step": 138000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T16:02:52Z",
+      "elo": 1553
+    },
+    {
+      "file": "checkpoint_139000.pth",
+      "step": 139000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T16:13:14Z",
+      "elo": 1687
+    },
+    {
+      "file": "checkpoint_140000.pth",
+      "step": 140000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T16:23:58Z",
+      "elo": 1690
+    },
+    {
+      "file": "checkpoint_141000.pth",
+      "step": 141000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T16:42:07Z",
+      "elo": 1647
+    },
+    {
+      "file": "checkpoint_142000.pth",
+      "step": 142000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T16:55:07Z",
+      "elo": 1756
+    },
+    {
+      "file": "checkpoint_143000.pth",
+      "step": 143000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T17:08:00Z",
+      "elo": 1791
+    },
+    {
+      "file": "checkpoint_144000.pth",
+      "step": 144000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T17:20:37Z",
+      "elo": 1678
+    },
+    {
+      "file": "checkpoint_145000.pth",
+      "step": 145000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T17:33:31Z",
+      "elo": 1718
+    },
+    {
+      "file": "checkpoint_146000.pth",
+      "step": 146000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T18:35:39Z",
+      "elo": 1697
+    },
+    {
+      "file": "checkpoint_147000.pth",
+      "step": 147000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T18:46:46Z",
+      "elo": 1707
+    },
+    {
+      "file": "checkpoint_148000.pth",
+      "step": 148000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T18:58:10Z",
+      "elo": 1804
+    },
+    {
+      "file": "checkpoint_149000.pth",
+      "step": 149000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T19:09:38Z",
+      "elo": 1699
+    },
+    {
+      "file": "checkpoint_150000.pth",
+      "step": 150000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T19:21:31Z",
+      "elo": 1737
+    },
+    {
+      "file": "checkpoint_151000.pth",
+      "step": 151000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T19:33:17Z",
+      "elo": 1686
+    },
+    {
+      "file": "checkpoint_152000.pth",
+      "step": 152000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T19:44:26Z",
+      "elo": 1730
+    },
+    {
+      "file": "checkpoint_153000.pth",
+      "step": 153000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T19:56:40Z",
+      "elo": 1709
+    },
+    {
+      "file": "checkpoint_154000.pth",
+      "step": 154000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T20:07:50Z",
+      "elo": 1686
+    },
+    {
+      "file": "checkpoint_155000.pth",
+      "step": 155000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T20:19:51Z",
+      "elo": 1725
+    },
+    {
+      "file": "checkpoint_156000.pth",
+      "step": 156000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T20:31:50Z",
+      "elo": 1701
+    },
+    {
+      "file": "checkpoint_157000.pth",
+      "step": 157000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T20:43:11Z",
+      "elo": 1720
+    },
+    {
+      "file": "checkpoint_158000.pth",
+      "step": 158000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T20:54:53Z",
+      "elo": 1726
+    },
+    {
+      "file": "checkpoint_159000.pth",
+      "step": 159000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T21:07:00Z",
+      "elo": 1714
+    },
+    {
+      "file": "checkpoint_160000.pth",
+      "step": 160000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T21:17:31Z",
+      "elo": 1792
+    },
+    {
+      "file": "checkpoint_161000.pth",
+      "step": 161000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T21:27:56Z",
+      "elo": 1649
+    },
+    {
+      "file": "checkpoint_162000.pth",
+      "step": 162000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T21:39:53Z",
+      "elo": 1729
+    },
+    {
+      "file": "checkpoint_163000.pth",
+      "step": 163000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T21:50:48Z",
+      "elo": 1728
+    },
+    {
+      "file": "checkpoint_164000.pth",
+      "step": 164000,
+      "label": "Advanced",
+      "timestamp": "2026-02-25T22:01:34Z",
+      "elo": 1610
+    },
+    {
+      "file": "checkpoint_165000.pth",
+      "step": 165000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T22:16:58Z",
+      "elo": 1724
+    },
+    {
+      "file": "checkpoint_166000.pth",
+      "step": 166000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T22:38:00Z",
+      "elo": 1762
+    },
+    {
+      "file": "checkpoint_167000.pth",
+      "step": 167000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T23:00:24Z",
+      "elo": 1811
+    },
+    {
+      "file": "checkpoint_168000.pth",
+      "step": 168000,
+      "label": "Expert",
+      "timestamp": "2026-02-25T23:29:11Z",
+      "elo": 1849
+    },
+    {
+      "file": "checkpoint_169000.pth",
+      "step": 169000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T00:09:57Z",
+      "elo": 1836
+    },
+    {
+      "file": "checkpoint_170000.pth",
+      "step": 170000,
+      "label": "Advanced",
+      "timestamp": "2026-02-26T00:41:34Z",
+      "elo": 1699
+    },
+    {
+      "file": "checkpoint_171000.pth",
+      "step": 171000,
+      "label": "Advanced",
+      "timestamp": "2026-02-26T01:06:36Z",
+      "elo": 1697
+    },
+    {
+      "file": "checkpoint_172000.pth",
+      "step": 172000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T01:25:51Z",
+      "elo": 1704
+    },
+    {
+      "file": "checkpoint_173000.pth",
+      "step": 173000,
+      "label": "Advanced",
+      "timestamp": "2026-02-26T02:12:12Z",
+      "elo": 1657
+    },
+    {
+      "file": "checkpoint_174000.pth",
+      "step": 174000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T02:42:03Z",
+      "elo": 1838
+    },
+    {
+      "file": "checkpoint_175000.pth",
+      "step": 175000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T04:28:49Z",
+      "elo": 1740
+    },
+    {
+      "file": "checkpoint_176000.pth",
+      "step": 176000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T20:39:50Z",
+      "elo": 1747
+    },
+    {
+      "file": "checkpoint_177000.pth",
+      "step": 177000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T20:53:28Z",
+      "elo": 1815
+    },
+    {
+      "file": "checkpoint_178000.pth",
+      "step": 178000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T21:27:37Z",
+      "elo": 1794
+    },
+    {
+      "file": "checkpoint_179000.pth",
+      "step": 179000,
+      "label": "Advanced",
+      "timestamp": "2026-02-26T22:46:15Z",
+      "elo": 1682
+    },
+    {
+      "file": "checkpoint_180000.pth",
+      "step": 180000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T22:59:11Z",
+      "elo": 1706
+    },
+    {
+      "file": "checkpoint_181000.pth",
+      "step": 181000,
+      "label": "Expert",
+      "timestamp": "2026-02-26T23:12:43Z",
+      "elo": 1775
+    }
+  ]
+}

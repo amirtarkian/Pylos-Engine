@@ -190,6 +190,10 @@
       background: linear-gradient(90deg, #a855f7, #7c3aed);
     }
 
+    .progress-fill.v6 {
+      background: linear-gradient(90deg, #22d3ee, #0891b2);
+    }
+
     /* ── Charts ───────────────────────────────────────── */
 
     .chart-container {
@@ -266,6 +270,7 @@
     .ckpt-table .wr-bar.v3 { background: #51cf66; }
     .ckpt-table .wr-bar.v4 { background: #f0c040; }
     .ckpt-table .wr-bar.v5 { background: #a855f7; }
+    .ckpt-table .wr-bar.v6 { background: #22d3ee; }
 
     .table-scroll {
       max-height: 400px;
@@ -325,6 +330,12 @@
       background: rgba(168, 85, 247, 0.2);
       color: #a855f7;
       border-color: rgba(168, 85, 247, 0.3);
+    }
+
+    .tab-btn.active.v6 {
+      background: rgba(34, 211, 238, 0.2);
+      color: #22d3ee;
+      border-color: rgba(34, 211, 238, 0.3);
     }
 
     /* ── Chart zoom controls ──────────────────────────── */
@@ -391,6 +402,46 @@
   </div>
 
   <div class="dashboard">
+    <!-- v6 Run Card (active) -->
+    <div class="card full-width" id="card-v6">
+      <h2>v6 — 500k Tuned Hyperparams <span class="badge idle" id="badge-v6">IDLE</span></h2>
+      <div class="progress-container">
+        <div class="progress-header">
+          <span class="games" id="games-v6">0 / 0</span>
+          <span class="pct" id="pct-v6">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill v6" id="bar-v6"></div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="label">Value Loss</span>
+          <span class="value" id="vloss-v6">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Policy Loss</span>
+          <span class="value" id="ploss-v6">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">Speed</span>
+          <span class="value small" id="speed-v6">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="label">ETA</span>
+          <span class="value small" id="eta-v6">—</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="loss-v6" height="180"></canvas>
+        <div class="chart-zoom">
+          <label>Zoom</label>
+          <input type="range" id="zoom-v6" min="0" max="100" value="80" />
+          <span class="zoom-label" id="zoom-label-v6">Last 500</span>
+        </div>
+      </div>
+    </div>
+
     <!-- v5 Run Card (active) -->
     <div class="card full-width" id="card-v5">
       <h2>v5 — 500k Deeper ResNet + Rich Obs <span class="badge idle" id="badge-v5">IDLE</span></h2>
@@ -602,6 +653,7 @@
           <span><span class="dot" style="background:#51cf66;"></span> v3</span>
           <span><span class="dot" style="background:#f0c040;"></span> v4</span>
           <span><span class="dot" style="background:#a855f7;"></span> v5</span>
+          <span><span class="dot" style="background:#22d3ee;"></span> v6</span>
           <span style="color:#555a70;">Random = 1000 ELO</span>
         </div>
       </div>
@@ -617,6 +669,7 @@
         <button class="tab-btn v3" data-filter="v3">v3</button>
         <button class="tab-btn v4" data-filter="v4">v4</button>
         <button class="tab-btn v5" data-filter="v5">v5</button>
+        <button class="tab-btn v6" data-filter="v6">v6</button>
       </div>
       <div class="table-scroll">
         <table class="ckpt-table">
@@ -661,10 +714,11 @@ const lossHistories = {
   v3: { value: [], policy: [] },
   v4: { value: [], policy: [] },
   v5: { value: [], policy: [] },
+  v6: { value: [], policy: [] },
 };
 
 // Zoom state: slider value 0-100, maps exponentially from 50 points to all
-const zoomState = { v1: 80, v2: 80, v3: 80, v4: 80, v5: 80 };
+const zoomState = { v1: 80, v2: 80, v3: 80, v4: 80, v5: 80, v6: 80 };
 
 function getVisibleWindow(run) {
   const total = lossHistories[run].value.length;
@@ -690,7 +744,7 @@ let currentFilter = "all";
 // ── DOM refs ─────────────────────────────────────────
 
 const runs = {};
-for (const r of ["v1", "v2", "v3", "v4", "v5"]) {
+for (const r of ["v1", "v2", "v3", "v4", "v5", "v6"]) {
   runs[r] = {
     badge:   document.getElementById(`badge-${r}`),
     games:   document.getElementById(`games-${r}`),
@@ -707,7 +761,7 @@ for (const r of ["v1", "v2", "v3", "v4", "v5"]) {
 }
 
 // Zoom slider event listeners
-for (const r of ["v1", "v2", "v3", "v4", "v5"]) {
+for (const r of ["v1", "v2", "v3", "v4", "v5", "v6"]) {
   const slider = runs[r].zoom;
   if (!slider) continue;
   slider.addEventListener("input", () => {
@@ -895,7 +949,7 @@ function drawEloChart(checkpoints) {
 
   ctx.clearRect(0, 0, w, h);
 
-  const seriesMap = { v1: [], v2: [], v3: [], v4: [], v5: [] };
+  const seriesMap = { v1: [], v2: [], v3: [], v4: [], v5: [], v6: [] };
   for (const cp of checkpoints) {
     if (cp.elo == null && cp.win_rate_vs_random == null) continue; // skip unevaluated
     const elo = cp.elo != null ? cp.elo : winRateToElo(cp.win_rate_vs_random ?? 0.5);
@@ -1029,7 +1083,7 @@ function drawEloChart(checkpoints) {
     ctx.fillText(Math.round(last.elo), toX(last.step) + 8, toY(last.elo) + 4);
   }
 
-  const seriesColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040", v5: "#a855f7" };
+  const seriesColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040", v5: "#a855f7", v6: "#22d3ee" };
   for (const [ver, points] of Object.entries(seriesMap)) {
     drawSeries(points, seriesColors[ver] || "#aaa");
   }
@@ -1056,7 +1110,7 @@ function renderTable(checkpoints) {
     // ELO bar: scale 800-2000 range to 0-100px
     const barWidth = elo != null ? Math.max(2, Math.round(((elo - 800) / 1200) * 100)) : 0;
 
-    const verColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040", v5: "#a855f7" };
+    const verColors = { v1: "#4a6cf7", v2: "#e8563d", v3: "#51cf66", v4: "#f0c040", v5: "#a855f7", v6: "#22d3ee" };
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="color:${verColors[ver] || "#4a6cf7"};font-weight:600;">${ver.toUpperCase()}</td>
@@ -1078,11 +1132,9 @@ async function poll() {
       fetch("/checkpoints").then(r => r.json()),
     ]);
 
-    if (statusResp.v1) updateRun("v1", statusResp.v1);
-    if (statusResp.v2) updateRun("v2", statusResp.v2);
-    if (statusResp.v3) updateRun("v3", statusResp.v3);
-    if (statusResp.v4) updateRun("v4", statusResp.v4);
-    if (statusResp.v5) updateRun("v5", statusResp.v5);
+    for (const run of ["v1", "v2", "v3", "v4", "v5", "v6"]) {
+      if (statusResp[run]) updateRun(run, statusResp[run]);
+    }
 
     const checkpoints = ckptResp.checkpoints || [];
     drawEloChart(checkpoints);

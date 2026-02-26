@@ -1,178 +1,192 @@
 """
-Backfill ELO ratings by pitting each checkpoint against the previous one.
+Backfill ELO ratings for checkpoints using MLE estimation.
 
-Uses Dirichlet noise in MCTS to produce varied games (without noise, MCTS
-is fully deterministic and every game between the same two models is
-identical). Both players alternate white/black to cancel first-player bias.
+Evaluates each checkpoint against a set of opponents (previous checkpoints
+within the same run + optionally cross-version anchors like V5 best).
+
+Usage:
+    .venv/bin/python engine/backfill_elo.py --ckpt-dir engine/checkpoints_v6 \
+        --anchor engine/checkpoints_v5/checkpoint_235000.pth:1781
 """
 
 import sys
 import os
 import json
 import math
+import argparse
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-import torch
-import numpy as np
-from game import PylosGame
-from models import PylosNetwork
-from agents import AlphaZeroAgent
-from mcts import play
-from evaluate import assign_label
+from evaluate import _load_agent, _play_match, evaluate_vs_model
 
-SEARCH_ITERATIONS = 16
-EVAL_GAMES = 20       # per matchup (10 as white, 10 as black)
-EVAL_EVERY = 5        # evaluate every Nth checkpoint
-BASE_ELO = 1000
-K_FACTOR = 32         # standard ELO K-factor
-DIRICHLET_ALPHA = 0.3 # exploration noise for varied games
-MOVE_LIMIT = 200      # max moves before declaring draw
+SEARCH_ITERS = 32     # faster than training eval (64) for backfill speed
+GAMES_PER_OPPONENT = 20
+RANDOM_ELO = 1000
 
 
-def load_agent(model_path):
-    """Load a checkpoint and return an AlphaZeroAgent."""
-    game = PylosGame()
-    model = PylosNetwork(game.observation_shape, game.action_space)
-    ckpt = torch.load(model_path, weights_only=True)
-    if "model_state_dict" in ckpt:
-        model.load_state_dict(ckpt["model_state_dict"])
-    else:
-        model.load_state_dict(ckpt)
-    model.eval()
-    return AlphaZeroAgent(model)
-
-
-def pit_with_limit(game, agent1, agent2, kwargs1, kwargs2, move_limit=MOVE_LIMIT):
-    """Play a game with move limit. Returns 1 (white wins), -1 (black wins), or 0 (draw)."""
-    current_agent, other_agent = agent1, agent2
-    current_kwargs, other_kwargs = kwargs1, kwargs2
-    moves = 0
-    while game.get_result() is None and moves < move_limit:
-        action = play(game, current_agent, **current_kwargs)
-        if action is None:
-            break
-        game.step(action)
-        current_agent, other_agent = other_agent, current_agent
-        current_kwargs, other_kwargs = other_kwargs, current_kwargs
-        moves += 1
-    result = game.get_result()
-    return result if result is not None else 0  # 0 = draw
-
-
-def head_to_head(agent_a, agent_b, num_games=EVAL_GAMES):
-    """Play agent_a vs agent_b, alternating colors. Returns agent_a's score (0.0-1.0).
-
-    Draws count as 0.5 for both sides.
-    """
-    kwargs = {"search_iterations": SEARCH_ITERATIONS, "dirichlet_alpha": DIRICHLET_ALPHA}
-    a_score = 0.0
-
-    for i in range(num_games):
-        game = PylosGame()
-        game.reset()
-        if i % 2 == 0:
-            # A plays white
-            result = pit_with_limit(game, agent_a, agent_b, kwargs, kwargs)
-            if result == 1:
-                a_score += 1.0
-            elif result == 0:
-                a_score += 0.5
+def _mle_elo(matchups):
+    """MLE ELO from list of (opponent_elo, wins, losses)."""
+    lo, hi = 0.0, 3000.0
+    for _ in range(100):
+        mid = (lo + hi) / 2
+        grad = 0.0
+        for opp_elo, wins, losses in matchups:
+            total = wins + losses
+            if total == 0:
+                continue
+            expected = 1.0 / (1.0 + 10 ** ((opp_elo - mid) / 400))
+            grad += (wins - total * expected) * math.log(10) / 400
+        if grad > 0:
+            lo = mid
         else:
-            # A plays black
-            result = pit_with_limit(game, agent_b, agent_a, kwargs, kwargs)
-            if result == -1:
-                a_score += 1.0
-            elif result == 0:
-                a_score += 0.5
-
-    return a_score / num_games
+            hi = mid
+        if hi - lo < 0.5:
+            break
+    return round((lo + hi) / 2)
 
 
-def elo_update(elo_a, elo_b, score_a):
-    """Update ELO rating for player A given their score (0-1) against player B."""
-    expected = 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
-    return elo_a + K_FACTOR * (score_a - expected)
+def _elo_label(elo):
+    if elo < 1050:
+        return "Beginner"
+    elif elo < 1200:
+        return "Novice"
+    elif elo < 1400:
+        return "Intermediate"
+    elif elo < 1600:
+        return "Advanced"
+    else:
+        return "Expert"
 
 
-def backfill_dir(ckpt_dir, label):
+def backfill(ckpt_dir, anchors=None, search_iters=SEARCH_ITERS,
+             games_per_opponent=GAMES_PER_OPPONENT, eval_every=1):
+    """Backfill ELO for all checkpoints in ckpt_dir.
+
+    anchors: list of (path, elo) tuples for cross-version opponents
+    """
     manifest_path = os.path.join(ckpt_dir, "manifest.json")
     if not os.path.isfile(manifest_path):
-        print(f"[{label}] No manifest found, skipping.")
+        print(f"No manifest at {manifest_path}")
         return
 
     with open(manifest_path, "r") as f:
         manifest = json.load(f)
 
     checkpoints = manifest.get("checkpoints", [])
-    total = len(checkpoints)
+    if not checkpoints:
+        print("No checkpoints in manifest.")
+        return
 
-    # Select which checkpoints to evaluate
-    eval_indices = [i for i in range(total) if i % EVAL_EVERY == 0]
-    if (total - 1) not in eval_indices:
-        eval_indices.append(total - 1)
+    # Load anchor agents once
+    anchor_agents = []
+    if anchors:
+        for anchor_path, anchor_elo in anchors:
+            if os.path.isfile(anchor_path):
+                print(f"Loading anchor: {anchor_path} (ELO {anchor_elo})")
+                agent = _load_agent(anchor_path)
+                anchor_agents.append((agent, anchor_elo, anchor_path))
+            else:
+                print(f"WARNING: anchor {anchor_path} not found, skipping")
 
-    print(f"[{label}] {total} checkpoints, evaluating {len(eval_indices)} in ELO ladder...")
+    # Select checkpoints to evaluate
+    indices = list(range(0, len(checkpoints), eval_every))
+    if (len(checkpoints) - 1) not in indices:
+        indices.append(len(checkpoints) - 1)
 
-    prev_agent = None
-    prev_elo = BASE_ELO
+    print(f"\n{len(checkpoints)} total checkpoints, evaluating {len(indices)}")
+    print(f"Search iters: {search_iters}, games/opponent: {games_per_opponent}\n")
 
-    for count, idx in enumerate(eval_indices):
+    # Track evaluated checkpoints for use as opponents
+    evaluated = []  # list of (step, elo, path)
+
+    for count, idx in enumerate(indices):
         cp = checkpoints[idx]
-        filepath = os.path.join(ckpt_dir, cp["file"].split("/")[-1])
+        filepath = os.path.join(ckpt_dir, cp["file"])
         if not os.path.isfile(filepath):
             print(f"  Skipping {cp['file']} (not found)")
             continue
 
-        print(f"  [{count + 1}/{len(eval_indices)}] step {cp['step']:>6}...", end=" ", flush=True)
+        step = cp["step"]
 
-        agent = load_agent(filepath)
+        # Skip if already evaluated (has elo and not "Evaluating...")
+        if cp.get("elo") is not None and cp.get("label") != "Evaluating...":
+            evaluated.append((step, cp["elo"], filepath))
+            print(f"  [{count+1}/{len(indices)}] step {step:>6}: ELO {cp['elo']} (cached)")
+            continue
 
-        if prev_agent is None:
-            # First checkpoint gets base ELO
-            cp["elo"] = BASE_ELO
-            cp["win_rate_vs_prev"] = 0.5
-            cp["label"] = "Novice"
-            print(f"ELO={BASE_ELO} (baseline)")
+        print(f"  [{count+1}/{len(indices)}] step {step:>6}...", end=" ", flush=True)
+
+        if not evaluated and not anchor_agents:
+            # First checkpoint, no opponents — baseline
+            cp["elo"] = RANDOM_ELO
+            cp["label"] = "Baseline"
+            evaluated.append((step, RANDOM_ELO, filepath))
+            print(f"ELO {RANDOM_ELO} (baseline)")
         else:
-            win_rate = head_to_head(agent, prev_agent)
-            new_elo = elo_update(prev_elo, prev_elo, win_rate)
-            # Clamp so ELO doesn't go below 100
-            new_elo = max(100, new_elo)
-            cp["elo"] = round(new_elo)
-            cp["win_rate_vs_prev"] = round(win_rate, 4)
-            cp["label"] = assign_label(win_rate)
-            print(f"WR={win_rate:.0%} vs prev, ELO={cp['elo']}")
-            prev_elo = new_elo
+            agent = _load_agent(filepath)
+            matchups = []
+            details = []
 
-        prev_agent = agent
+            # Play against anchors (cross-version)
+            for anchor_agent, anchor_elo, anchor_path in anchor_agents:
+                wr = _play_match(agent, anchor_agent, games_per_opponent,
+                                 search_iterations=search_iters)
+                wins = wr * games_per_opponent
+                losses = (1.0 - wr) * games_per_opponent
+                matchups.append((anchor_elo, wins, losses))
+                anchor_name = os.path.basename(os.path.dirname(anchor_path))
+                details.append(f"{anchor_name}({anchor_elo}): {wr:.0%}")
 
-        # Interpolate ELO for skipped checkpoints between this and the previous eval
-        if count > 0:
-            prev_eval_idx = eval_indices[count - 1]
-            prev_eval_elo = checkpoints[prev_eval_idx].get("elo", BASE_ELO)
-            curr_elo = cp["elo"]
-            gap = idx - prev_eval_idx
-            if gap > 1:
-                for j in range(prev_eval_idx + 1, idx):
-                    frac = (j - prev_eval_idx) / gap
-                    interp_elo = round(prev_eval_elo + frac * (curr_elo - prev_eval_elo))
-                    checkpoints[j]["elo"] = interp_elo
+            # Play against previous checkpoints in this run (up to 3)
+            opponents = evaluated[-3:] if len(evaluated) > 3 else evaluated[:]
+            for opp_step, opp_elo, opp_path in opponents:
+                wr = _play_match(agent, _load_agent(opp_path), games_per_opponent,
+                                 search_iterations=search_iters)
+                wins = wr * games_per_opponent
+                losses = (1.0 - wr) * games_per_opponent
+                matchups.append((opp_elo, wins, losses))
+                details.append(f"s{opp_step}({opp_elo}): {wr:.0%}")
+
+            elo = _mle_elo(matchups)
+            label = _elo_label(elo)
+            cp["elo"] = elo
+            cp["label"] = label
+            evaluated.append((step, elo, filepath))
+            print(f"ELO {elo} ({label}) — vs [{', '.join(details)}]")
 
         # Save after each evaluation
         with open(manifest_path, "w") as f:
             json.dump(manifest, f, indent=2)
 
-    print(f"[{label}] Done.")
+    print(f"\nDone! {len(indices)} checkpoints evaluated.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Backfill ELO ratings for checkpoints")
+    parser.add_argument("--ckpt-dir", type=str, required=True,
+                        help="Checkpoint directory (e.g., engine/checkpoints_v6)")
+    parser.add_argument("--anchor", type=str, action="append", default=[],
+                        help="Cross-version anchor as path:elo (e.g., checkpoints_v5/checkpoint_235000.pth:1781)")
+    parser.add_argument("--search-iters", type=int, default=SEARCH_ITERS,
+                        help=f"MCTS iterations (default: {SEARCH_ITERS})")
+    parser.add_argument("--games", type=int, default=GAMES_PER_OPPONENT,
+                        help=f"Games per opponent (default: {GAMES_PER_OPPONENT})")
+    parser.add_argument("--eval-every", type=int, default=1,
+                        help="Evaluate every Nth checkpoint (default: 1)")
+    args = parser.parse_args()
+
+    # Parse anchors
+    anchors = []
+    for a in args.anchor:
+        if ":" not in a:
+            print(f"ERROR: anchor must be path:elo, got '{a}'")
+            sys.exit(1)
+        path, elo_str = a.rsplit(":", 1)
+        anchors.append((path, int(elo_str)))
+
+    backfill(args.ckpt_dir, anchors=anchors, search_iters=args.search_iters,
+             games_per_opponent=args.games, eval_every=args.eval_every)
 
 
 if __name__ == "__main__":
-    engine_dir = os.path.dirname(os.path.abspath(__file__))
-
-    v1_dir = os.path.join(engine_dir, "checkpoints")
-    v2_dir = os.path.join(engine_dir, "checkpoints_v2")
-
-    backfill_dir(v1_dir, "v1")
-    backfill_dir(v2_dir, "v2")
-
-    print("\nBackfill complete!")
+    main()

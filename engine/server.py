@@ -58,14 +58,14 @@ CHECKPOINTS_V2_DIR = os.path.join(ENGINE_DIR, "checkpoints_v2")
 CHECKPOINTS_V3_DIR = os.path.join(ENGINE_DIR, "checkpoints_v3")
 CHECKPOINTS_V4_DIR = os.path.join(ENGINE_DIR, "checkpoints_v4")
 CHECKPOINTS_V5_DIR = os.path.join(ENGINE_DIR, "checkpoints_v5")
+CHECKPOINTS_V6_DIR = os.path.join(ENGINE_DIR, "checkpoints_v6")
 
 # All training runs: (label, directory)
+# Note: V1/V2/V3 excluded — old MLP architecture incompatible with current PylosNetwork
 TRAINING_RUNS = [
-    ("v1", CHECKPOINTS_DIR),
-    ("v2", CHECKPOINTS_V2_DIR),
-    ("v3", CHECKPOINTS_V3_DIR),
     ("v4", CHECKPOINTS_V4_DIR),
     ("v5", CHECKPOINTS_V5_DIR),
+    ("v6", CHECKPOINTS_V6_DIR),
 ]
 
 # ---------------------------------------------------------------------------
@@ -453,17 +453,32 @@ async def _do_ai_turn(
         return True
 
     action_json = _action_to_json(game, action)
-    game.step(action)  # auto_remove=True by default (AI uses greedy removal)
 
-    # Extract auto-removed pieces from the actions stack
+    # Step WITHOUT auto-removal so we can capture the formation positions
+    # before any pieces are removed (removal could break the pattern visually).
+    game.step(action, auto_remove=False)
+
+    # Capture formation positions and perform greedy removal manually
+    formation_json = []
     removed_json = []
-    if game.actions_stack:
-        last_entry = game.actions_stack[-1]
-        removed_pieces = last_entry[-1]  # last element is the removed list
-        if removed_pieces:
-            player_names = {1: "white", -1: "black"}
-            for rl, rr, rc in removed_pieces:
-                removed_json.append({"level": rl, "row": rr, "col": rc})
+    if game.pending_removal:
+        # Capture the completed pattern (square/line) for orange highlight
+        for fl, fr, fc in game.get_formation_positions():
+            formation_json.append({"level": fl, "row": fr, "col": fc})
+
+        # Greedy AI removal: remove up to 2 pieces (lowest level first)
+        for _ in range(2):
+            removable = game.get_pending_removable()
+            if not removable:
+                break
+            removable.sort(key=lambda x: (x[0], x[1], x[2]))
+            rl, rr, rc = removable[0]
+            game.step_removal(rl, rr, rc)
+            removed_json.append({"level": rl, "row": rr, "col": rc})
+
+        # End removal phase if still pending (chose fewer than max)
+        if game.pending_removal:
+            game.skip_removal()
 
     ai_move_msg = {
         "type": "ai_move",
@@ -472,6 +487,8 @@ async def _do_ai_turn(
     }
     if removed_json:
         ai_move_msg["removed"] = removed_json
+    if formation_json:
+        ai_move_msg["formation"] = formation_json
 
     await ws.send_json(ai_move_msg)
 
@@ -535,7 +552,11 @@ async def game_ws(ws: WebSocket):
                 if mode == "human_vs_ai":
                     checkpoint = raw.get("checkpoint")
                     if checkpoint:
-                        agent = load_ai_agent(checkpoint)
+                        try:
+                            agent = load_ai_agent(checkpoint)
+                        except Exception as e:
+                            await ws.send_json({"type": "error", "message": f"Failed to load checkpoint: {e}"})
+                            continue
                     search_iters = raw.get("search_iterations", 32)
                     hc = raw.get("human_color", "white")
                     human_color = 1 if hc == "white" else -1
@@ -544,10 +565,14 @@ async def game_ws(ws: WebSocket):
                     # Support dual checkpoints: one for white, one for black
                     ckpt_white = raw.get("checkpoint_white") or raw.get("checkpoint")
                     ckpt_black = raw.get("checkpoint_black") or raw.get("checkpoint")
-                    if ckpt_white:
-                        agent_white = load_ai_agent(ckpt_white)
-                    if ckpt_black:
-                        agent_black = load_ai_agent(ckpt_black)
+                    try:
+                        if ckpt_white:
+                            agent_white = load_ai_agent(ckpt_white)
+                        if ckpt_black:
+                            agent_black = load_ai_agent(ckpt_black)
+                    except Exception as e:
+                        await ws.send_json({"type": "error", "message": f"Failed to load checkpoint: {e}"})
+                        continue
                     # Fallback: single agent for both sides
                     agent = agent_white or agent_black
                     search_iters = raw.get("search_iterations", 32)

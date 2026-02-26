@@ -24,6 +24,7 @@ let removablePieces = []; // [{level, row, col}, ...]
 
 // AI removal animation state
 let pendingAiRemovals = null; // [{level, row, col}, ...] or null
+let pendingAiFormation = null; // [{level, row, col}, ...] or null -- formation to flash orange
 let aiRemovalAnimating = false;
 const DROP_ANIM_WAIT = 600; // ms to wait for placement drop animation before flashing removals
 
@@ -478,10 +479,15 @@ function handleMessage(msg) {
         pendingHumanMove = null;
       }
 
-      // If AI just removed pieces, animate the removal before updating board
-      if (pendingAiRemovals && pendingAiRemovals.length > 0 && !aiRemovalAnimating) {
-        const removals = pendingAiRemovals;
+      // If AI completed a formation and/or removed pieces, animate them
+      const hasAiRemovals = pendingAiRemovals && pendingAiRemovals.length > 0;
+      const hasAiFormation = pendingAiFormation && pendingAiFormation.length > 0;
+
+      if ((hasAiRemovals || hasAiFormation) && !aiRemovalAnimating) {
+        const removals = pendingAiRemovals || [];
+        const formation = pendingAiFormation || [];
         pendingAiRemovals = null;
+        pendingAiFormation = null;
         aiRemovalAnimating = true;
 
         // Determine AI color for putting removed pieces back temporarily
@@ -503,9 +509,21 @@ function handleMessage(msg) {
         selectedSphere = null;
         clearHighlights();
 
-        // After a short delay for the placement drop to land, flash removed pieces green
+        // After the placement drop lands, flash formation orange, then flash removals green
         setTimeout(() => {
-          flashAndRemove(removals, 1200, 600).then(() => {
+          // Step 1: Flash formation orange (the completed 2x2 square or line)
+          const formationPromise = formation.length > 0
+            ? flashFormation(formation, 800)
+            : Promise.resolve();
+
+          formationPromise.then(() => {
+            // Step 2: Flash and remove pieces green (if any were removed)
+            const removalPromise = removals.length > 0
+              ? flashAndRemove(removals, 1200, 600)
+              : Promise.resolve();
+
+            return removalPromise;
+          }).then(() => {
             aiRemovalAnimating = false;
             // Now sync to the real board state (pieces already gone)
             board = updateBoardFromState(board, msg.board);
@@ -530,6 +548,7 @@ function handleMessage(msg) {
       }
 
       pendingAiRemovals = null;
+      pendingAiFormation = null;
       board = updateBoardFromState(board, msg.board);
       legalMoves = msg.legal_moves || [];
 
@@ -623,9 +642,13 @@ function handleMessage(msg) {
         // Store removals so the next state update can animate them
         pendingAiRemovals = msg.removed;
       }
+      // Store formation positions so the next state update can flash them orange
+      if (msg.formation && msg.formation.length > 0) {
+        pendingAiFormation = msg.formation;
+      }
       addMoveToHistory(aiColor, fullDesc, msg.thinking_time_ms);
 
-      if (msg.removed && msg.removed.length > 0) {
+      if (msg.formation && msg.formation.length > 0) {
         setStatus("AI formed a pattern — removing pieces...", "info");
       }
       break;
@@ -683,6 +706,7 @@ function startNewGame() {
   removalPhase = false;
   removablePieces = [];
   pendingAiRemovals = null;
+  pendingAiFormation = null;
   aiRemovalAnimating = false;
   boardSnapshots = [];
   viewIndex = null;

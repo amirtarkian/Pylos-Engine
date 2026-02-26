@@ -56,7 +56,7 @@ class TestTrainSaveLoad:
             # Verify file exists and is loadable
             assert os.path.exists(model_path)
             state = torch.load(model_path, map_location="cpu", weights_only=True)
-            assert "fc1.weight" in state
+            assert "input_fc.weight" in state
 
 
 class TestMCTSPlay:

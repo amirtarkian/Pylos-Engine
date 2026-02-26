@@ -23,10 +23,11 @@ def test_model_output_shapes():
     model = PylosNetwork(game.observation_shape, game.action_space)
     obs = torch.tensor(game.to_observation(), device=model.device)
 
-    # Training mode
-    value, log_policy = model(obs.unsqueeze(0))
-    assert value.shape == (1, 1)
-    assert log_policy.shape == (1, 303)
+    # Training mode (batch of 2 required for BatchNorm)
+    batch = obs.unsqueeze(0).repeat(2, 1)
+    value, log_policy = model(batch)
+    assert value.shape == (2, 1)
+    assert log_policy.shape == (2, 303)
 
     # Inference mode
     val = model.value_forward(obs)

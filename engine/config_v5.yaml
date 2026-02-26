@@ -17,7 +17,7 @@ model:
 
 training:
   selfplay_games: 500000
-  search_iterations: 64
+  search_iterations: 128
   batch_size: 1024
   replay_buffer_size: 32768
   epochs_per_game: 4
@@ -40,9 +40,9 @@ training:
 
 checkpoints:
   save_every: 1000
-  eval_games: 200
-  dir: engine/checkpoints_v5
-  resume_from: engine/checkpoints_v5/checkpoint_242000.pth
+  eval_games: 40
+  dir: engine/checkpoints_v6
+  resume_from: engine/checkpoints_v6/checkpoint_66000.pth
 
 wandb:
   enabled: false

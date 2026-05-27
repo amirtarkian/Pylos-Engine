@@ -106,8 +106,8 @@ A new collapsible **"Camera Controls"** card in the existing right-sidebar glass
 **Mouse bindings.** Three rows — Left / Middle / Right — each a `<select>` of `{ Orbit, Pan, Fly, None }`. Validation rules:
 
 - At most one mouse button may have `Fly` assigned (UI shows an inline warning otherwise).
-- At least one button must be `Orbit` (otherwise the user has no way to orbit; UI shows warning).
-- Multiple buttons mapped to the same orbit-mode action (e.g. two = Pan) are allowed; only the lowest priority button wins per OrbitControls' internal handling.
+- At least one button must be `Orbit` or `Fly` (otherwise the user has no way to rotate the camera; UI shows warning).
+- Multiple buttons mapped to the same orbit-mode action (e.g. two = Pan) are allowed.
 
 **Fly keys.** Seven rebindable keys: Forward, Back, Left, Right, Up, Down, Speed-boost. Each is a button labelled with the current key (e.g. "W"). Clicking puts it into capture mode; the next `keydown` becomes the new binding. Escape cancels. Duplicate key assignments highlighted with a warning but allowed (last write wins).
 

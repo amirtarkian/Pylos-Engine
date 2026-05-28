@@ -499,7 +499,7 @@ function onPointerMove(event) {
 }
 
 // Track drag distance so camera drags don't trigger piece placement.
-let _pointerDownState = null; // { button, x, y }
+let _pointerDownState = null; // { x, y }
 const DRAG_PX_THRESHOLD = 4;
 
 function onPointerDown(event) {

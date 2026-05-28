@@ -12,8 +12,6 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { DEFAULT_BINDINGS } from "./camera-bindings.js";
 
-const MOUSE_BUTTON_INDEX = { left: 0, middle: 1, right: 2 };
-
 const ORBIT_ACTION_MAP = {
   orbit: THREE.MOUSE.ROTATE,
   pan: THREE.MOUSE.PAN,

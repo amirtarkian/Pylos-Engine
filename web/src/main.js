@@ -37,6 +37,8 @@ let viewIndex = null;    // null = live (latest), number = viewing history
 // Track pending human move for logging to history
 let pendingHumanMove = null; // {action, playerColor} or null
 
+let activeGameMode = null; // Set when a new_game message is sent; reflects the running game's mode.
+
 // ── DOM refs ─────────────────────────────────────────────────────
 const whiteReservesEl = document.getElementById("white-reserves");
 const blackReservesEl = document.getElementById("black-reserves");
@@ -308,9 +310,9 @@ function updateMovePosition() {
 
 function updateUndoButtonVisibility() {
   if (!btnUndoMoveEl) return;
-  const inHvH = selModeEl.value === "human_vs_human";
+  const inHvH = activeGameMode === "human_vs_human";
   const hasMoves = boardSnapshots.length > 1;
-  const allowed = inHvH && hasMoves && !gameOver && !isViewingHistory() && !removalPhase;
+  const allowed = inHvH && hasMoves && !gameOver && !isViewingHistory() && !removalPhase && pendingHumanMove === null;
   btnUndoMoveEl.classList.toggle("hidden", !inHvH);
   btnUndoMoveEl.disabled = !allowed;
 }
@@ -803,6 +805,7 @@ function startNewGame() {
     payload.search_iterations = parseInt(selSearchItersEl.value);
   }
 
+  activeGameMode = mode;
   send(payload);
   setStatus("Starting new game...", "info", 2000);
   updateUndoButtonVisibility();

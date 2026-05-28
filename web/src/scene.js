@@ -507,11 +507,17 @@ function onPointerDown(event) {
     _pointerDownState = null;
     return;
   }
-  _pointerDownState = { button: 0, x: event.clientX, y: event.clientY };
+  _pointerDownState = { x: event.clientX, y: event.clientY };
 }
 
 function onPointerUp(event) {
   if (event.button !== 0 || _pointerDownState === null) return;
+  // If the camera is in Fly mode (pointer locked), clientX/Y is stale.
+  // Drop the recorded down-state and don't fire a placement.
+  if (controls && controls.isFlying) {
+    _pointerDownState = null;
+    return;
+  }
   const dx = event.clientX - _pointerDownState.x;
   const dy = event.clientY - _pointerDownState.y;
   _pointerDownState = null;

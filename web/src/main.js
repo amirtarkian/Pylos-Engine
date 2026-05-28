@@ -7,6 +7,8 @@
 import { createEmptyBoard, updateBoardFromState } from "./game.js";
 import { init as initScene, setCallbacks, updateBoard, highlightSphere, clearHighlights, flashFormation, flashAndRemove } from "./scene.js";
 import { connect, send, fetchCheckpoints, fetchTrainingStatus, fetchLossHistory } from "./network.js";
+import { DEFAULT_BINDINGS, loadBindings, saveBindings, validateBindings } from "./camera-bindings.js";
+import { setCameraBindings } from "./scene.js";
 
 // ── State ────────────────────────────────────────────────────────
 let board = createEmptyBoard();
@@ -46,6 +48,17 @@ const selDifficultyEl = document.getElementById("sel-difficulty");
 const selColorEl = document.getElementById("sel-color");
 const btnNewGameEl = document.getElementById("btn-new-game");
 const btnUndoMoveEl = document.getElementById("btn-undo-move");
+const camToggleEl = document.getElementById("cam-controls-toggle");
+const camCaretEl = document.getElementById("cam-controls-caret");
+const camBodyEl = document.getElementById("cam-controls-body");
+const camMouseEls = {
+  left: document.getElementById("cam-mouse-left"),
+  middle: document.getElementById("cam-mouse-middle"),
+  right: document.getElementById("cam-mouse-right"),
+};
+const camWarningEl = document.getElementById("cam-bindings-warning");
+const camKeyBtnEls = Array.from(document.querySelectorAll(".cam-key-btn"));
+const camResetEl = document.getElementById("cam-reset-defaults");
 const groupDifficultyEl = document.getElementById("group-difficulty");
 const groupColorEl = document.getElementById("group-color");
 const btnDoneRemovingEl = document.getElementById("btn-done-removing");
@@ -1310,6 +1323,78 @@ function main() {
       });
     }
   }
+
+  // ── Camera bindings UI ──────────────────────────────────────────
+  let camBindings = loadBindings();
+  let camCapturingKey = null; // "forward"|...|null
+
+  function paintCamUI() {
+    for (const btn of ["left", "middle", "right"]) {
+      camMouseEls[btn].value = camBindings.mouse[btn];
+    }
+    for (const el of camKeyBtnEls) {
+      const which = el.dataset.key;
+      el.textContent = camBindings.fly[which];
+      el.classList.toggle("capturing", camCapturingKey === which);
+    }
+    // Warnings
+    const flyCount = Object.values(camBindings.mouse).filter((v) => v === "fly").length;
+    const hasRotate = Object.values(camBindings.mouse).some((v) => v === "orbit" || v === "fly");
+    const warnings = [];
+    if (flyCount > 1) warnings.push("Multiple buttons set to Fly; only one will activate fly mode.");
+    if (!hasRotate) warnings.push("No button can rotate the camera (assign Orbit or Fly).");
+    camWarningEl.textContent = warnings.join(" ");
+  }
+
+  function persistAndApply() {
+    if (!validateBindings(camBindings)) {
+      camBindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+    }
+    saveBindings(camBindings);
+    setCameraBindings(camBindings);
+    paintCamUI();
+  }
+
+  camToggleEl.addEventListener("click", () => {
+    const open = !camBodyEl.classList.contains("hidden");
+    camBodyEl.classList.toggle("hidden", open);
+    camCaretEl.innerHTML = open ? "▸" : "▾";
+  });
+
+  for (const btn of ["left", "middle", "right"]) {
+    camMouseEls[btn].addEventListener("change", (e) => {
+      camBindings.mouse[btn] = e.target.value;
+      persistAndApply();
+    });
+  }
+
+  for (const el of camKeyBtnEls) {
+    el.addEventListener("click", () => {
+      camCapturingKey = el.dataset.key;
+      paintCamUI();
+    });
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (!camCapturingKey) return;
+    if (e.code === "Escape") {
+      camCapturingKey = null;
+      paintCamUI();
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation(); // don't trigger nav shortcuts (← → Space Home End)
+    camBindings.fly[camCapturingKey] = e.code;
+    camCapturingKey = null;
+    persistAndApply();
+  }, true); // capture phase so the key isn't consumed by fly-mode or nav handlers
+
+  camResetEl.addEventListener("click", () => {
+    camBindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+    persistAndApply();
+  });
+
+  paintCamUI();
 
   // Initial mode visibility
   updateModeVisibility();

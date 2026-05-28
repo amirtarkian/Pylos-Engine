@@ -176,6 +176,21 @@
       cursor: not-allowed;
     }
 
+    .cam-key-btn {
+      padding: 4px 8px;
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+      background: rgba(255,255,255,0.05);
+      color: #d4d8e8;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .cam-key-btn.capturing {
+      background: rgba(74,108,247,0.25);
+      border-color: #4a6cf7;
+    }
+
     /* ── Move History (chess-style paired layout) ────────────── */
     #move-history-wrapper {
       flex: 1;
@@ -862,6 +877,53 @@
         <button id="nav-pause" title="Pause / Resume (Space)">&#9646;&#9646;</button>
         <button id="nav-next" title="Next move (→)">&#9654;</button>
         <button id="nav-last" title="Live / Latest (End)" class="live-active">&#9654;|</button>
+      </div>
+    </div>
+    <div id="camera-controls-card" class="control-group" style="margin-top:12px;">
+      <button id="cam-controls-toggle" class="glass" style="
+        width:100%;padding:8px;display:flex;justify-content:space-between;
+        align-items:center;background:transparent;color:#d4d8e8;
+        border:1px solid rgba(255,255,255,0.1);border-radius:6px;
+        font-size:11px;text-transform:uppercase;letter-spacing:1px;cursor:pointer;">
+        <span>Camera Controls</span><span id="cam-controls-caret">&#9656;</span>
+      </button>
+      <div id="cam-controls-body" class="hidden" style="margin-top:8px;font-size:11px;color:#d4d8e8;">
+        <div style="margin-bottom:6px;color:#7a82a0;">Mouse buttons</div>
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          Left
+          <select id="cam-mouse-left" style="flex:1;">
+            <option value="orbit">Orbit</option><option value="pan">Pan</option>
+            <option value="fly">Fly</option><option value="none">None</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          Middle
+          <select id="cam-mouse-middle" style="flex:1;">
+            <option value="orbit">Orbit</option><option value="pan">Pan</option>
+            <option value="fly">Fly</option><option value="none">None</option>
+          </select>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          Right
+          <select id="cam-mouse-right" style="flex:1;">
+            <option value="orbit">Orbit</option><option value="pan">Pan</option>
+            <option value="fly">Fly</option><option value="none">None</option>
+          </select>
+        </label>
+        <div id="cam-bindings-warning" style="color:#ffb86b;font-size:10px;min-height:14px;margin-bottom:6px;"></div>
+        <div style="margin-bottom:6px;color:#7a82a0;">Fly keys</div>
+        <div id="cam-fly-keys-grid" style="display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;">
+          <span>Forward</span><button class="cam-key-btn" data-key="forward"></button>
+          <span>Back</span><button class="cam-key-btn" data-key="back"></button>
+          <span>Left</span><button class="cam-key-btn" data-key="left"></button>
+          <span>Right</span><button class="cam-key-btn" data-key="right"></button>
+          <span>Up</span><button class="cam-key-btn" data-key="up"></button>
+          <span>Down</span><button class="cam-key-btn" data-key="down"></button>
+          <span>Boost</span><button class="cam-key-btn" data-key="boost"></button>
+        </div>
+        <button id="cam-reset-defaults" style="margin-top:8px;width:100%;padding:6px;">
+          Reset to Unity defaults
+        </button>
       </div>
     </div>
   </div>

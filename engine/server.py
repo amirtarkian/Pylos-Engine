@@ -807,9 +807,11 @@ async def game_ws(ws: WebSocket):
                     elif isinstance(entry, str) and entry.startswith("remove:"):
                         _, coords = entry.split(":", 1)
                         l, r, c = (int(x) for x in coords.split(","))
-                        game.step_removal(l, r, c)
+                        assert game.step_removal(l, r, c), f"replay failed at {entry!r}"
                     elif entry == "skip_removal":
-                        game.skip_removal()
+                        assert game.skip_removal(), f"replay failed at {entry!r}"
+                    else:
+                        raise ValueError(f"unknown action_stack entry: {entry!r}")
 
                 state = make_state_msg(game)
                 state["take_back"] = True

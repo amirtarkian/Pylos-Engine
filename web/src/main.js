@@ -45,6 +45,7 @@ const selModeEl = document.getElementById("sel-mode");
 const selDifficultyEl = document.getElementById("sel-difficulty");
 const selColorEl = document.getElementById("sel-color");
 const btnNewGameEl = document.getElementById("btn-new-game");
+const btnUndoMoveEl = document.getElementById("btn-undo-move");
 const groupDifficultyEl = document.getElementById("group-difficulty");
 const groupColorEl = document.getElementById("group-color");
 const btnDoneRemovingEl = document.getElementById("btn-done-removing");
@@ -162,6 +163,25 @@ function clearMoveHistory() {
   viewIndex = null;
   updateNavButtons();
   updateMovePosition();
+  updateUndoButtonVisibility();
+}
+
+function retractLastMoveFromHistory() {
+  // Drop the last filled move cell. If the row only had a white cell, remove the row.
+  if (!currentMoveRow) return;
+  const blackCell = currentMoveRow.querySelector(".move-cell.black-move");
+  if (blackCell) {
+    blackCell.className = "move-cell placeholder";
+    blackCell.textContent = "…";
+    blackCell.removeAttribute("data-idx");
+    blackCell.replaceWith(blackCell.cloneNode(true)); // strip listeners
+    return;
+  }
+  // No black cell yet -> drop the whole row, decrement turn number.
+  currentMoveRow.remove();
+  turnNumber = Math.max(0, turnNumber - 1);
+  currentMoveRow = moveHistoryEl.lastElementChild || null;
+  if (moveCount > 0) moveCount--;
 }
 
 // ── Move navigation helpers ──────────────────────────────────────
@@ -225,6 +245,7 @@ function updateNavButtons() {
   }
 
   updateMovePosition();
+  updateUndoButtonVisibility();
 }
 
 function highlightMoveEntry(idx) {
@@ -271,6 +292,15 @@ function updateMovePosition() {
   movePositionEl.textContent = `Move ${pos} / ${total}`;
 }
 
+function updateUndoButtonVisibility() {
+  if (!btnUndoMoveEl) return;
+  const inHvH = selModeEl.value === "human_vs_human";
+  const hasMoves = boardSnapshots.length > 1;
+  const allowed = inHvH && hasMoves && !gameOver && !isViewingHistory();
+  btnUndoMoveEl.classList.toggle("hidden", !inHvH);
+  btnUndoMoveEl.disabled = !allowed;
+}
+
 // ── UI state updates ─────────────────────────────────────────────
 
 function updateTurnUI(turn) {
@@ -308,6 +338,7 @@ function updateModeVisibility() {
     groupSpeedEl.classList.add("hidden");
     groupSearchItersEl.classList.add("hidden");
   }
+  updateUndoButtonVisibility();
 }
 
 // ── Checkpoint loading ───────────────────────────────────────────
@@ -464,6 +495,18 @@ function onSphereClick(level, row, col, player) {
 function handleMessage(msg) {
   switch (msg.type) {
     case "state": {
+      if (msg.take_back) {
+        boardSnapshots.pop();
+        retractLastMoveFromHistory();
+        pendingHumanMove = null;
+        viewIndex = null;
+        gameOver = false;
+        updateNavButtons();
+        updateMovePosition();
+        updateUndoButtonVisibility();
+        // Fall through: the rest of the state branch updates board/turn/reserves
+        // from msg as usual, which is exactly what we want.
+      }
       gameOver = false;
       removalPhase = false;
       removablePieces = [];
@@ -737,6 +780,7 @@ function startNewGame() {
 
   send(payload);
   setStatus("Starting new game...", "info", 2000);
+  updateUndoButtonVisibility();
 }
 
 // ── Training Dashboard ───────────────────────────────────────────
@@ -1156,6 +1200,11 @@ function main() {
   // UI event listeners
   selModeEl.addEventListener("change", updateModeVisibility);
   btnNewGameEl.addEventListener("click", startNewGame);
+  btnUndoMoveEl.addEventListener("click", () => {
+    if (btnUndoMoveEl.disabled) return;
+    send({ type: "take_back" });
+    setStatus("Taking back...", "info", 1500);
+  });
   btnDoneRemovingEl.addEventListener("click", () => {
     if (removalPhase) {
       send({ type: "skip_removal" });

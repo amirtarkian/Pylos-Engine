@@ -531,6 +531,11 @@ async def game_ws(ws: WebSocket):
     step_event = asyncio.Event()  # triggers one AI move while paused
     shared_delay = [1500]  # mutable container so AI loop sees updates
 
+    # Per-session action history for take-back. Each entry is either an int
+    # (action index applied via PylosGame.step) or one of the sentinel strings
+    # "remove:L,R,C" / "skip_removal".
+    action_stack: list = []
+
     try:
         while True:
             raw = await ws.receive_json()
@@ -546,6 +551,7 @@ async def game_ws(ws: WebSocket):
                     ai_vs_ai_task = None
 
                 game = PylosGame()
+                action_stack = []
                 mode = raw.get("mode", "human_vs_human")
                 agent = None
 
@@ -661,6 +667,7 @@ async def game_ws(ws: WebSocket):
                     continue
 
                 game.step(action, auto_remove=False)
+                action_stack.append(int(action))
 
                 # Check for interactive removal phase BEFORE game-over,
                 # since removing pieces may free up moves for the opponent
@@ -702,6 +709,7 @@ async def game_ws(ws: WebSocket):
                 if not game.step_removal(level, row, col):
                     await ws.send_json({"type": "error", "message": "Cannot remove that piece"})
                     continue
+                action_stack.append(f"remove:{level},{row},{col}")
 
                 # Still in removal phase?
                 if game.pending_removal:
@@ -735,6 +743,7 @@ async def game_ws(ws: WebSocket):
                     continue
 
                 game.skip_removal()
+                action_stack.append("skip_removal")
 
                 await ws.send_json(make_state_msg(game))
 
@@ -772,6 +781,41 @@ async def game_ws(ws: WebSocket):
 
             elif msg_type == "set_delay":
                 shared_delay[0] = max(0, int(raw.get("delay_ms", 1500)))
+
+            elif msg_type == "take_back":
+                if game is None:
+                    await ws.send_json({"type": "error", "message": "No active game"})
+                    continue
+                if mode != "human_vs_human":
+                    await ws.send_json({"type": "error", "message": "Take-back is only available in Human vs Human"})
+                    continue
+                if not action_stack:
+                    await ws.send_json({"type": "error", "message": "Nothing to take back"})
+                    continue
+
+                # Pop trailing remove/skip_removal entries, then the placement/raise that started the turn.
+                while action_stack and isinstance(action_stack[-1], str):
+                    action_stack.pop()
+                if action_stack:
+                    action_stack.pop()  # the placement/raise action int
+
+                # Replay remaining actions from a fresh game.
+                game = PylosGame()
+                for entry in action_stack:
+                    if isinstance(entry, int):
+                        game.step(entry, auto_remove=False)
+                    elif isinstance(entry, str) and entry.startswith("remove:"):
+                        _, coords = entry.split(":", 1)
+                        l, r, c = (int(x) for x in coords.split(","))
+                        assert game.step_removal(l, r, c), f"replay failed at {entry!r}"
+                    elif entry == "skip_removal":
+                        assert game.skip_removal(), f"replay failed at {entry!r}"
+                    else:
+                        raise ValueError(f"unknown action_stack entry: {entry!r}")
+
+                state = make_state_msg(game)
+                state["take_back"] = True
+                await ws.send_json(state)
 
             else:
                 await ws.send_json({"type": "error", "message": f"Unknown message type: {msg_type}"})

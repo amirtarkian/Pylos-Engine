@@ -7,6 +7,8 @@
 import { createEmptyBoard, updateBoardFromState } from "./game.js";
 import { init as initScene, setCallbacks, updateBoard, highlightSphere, clearHighlights, flashFormation, flashAndRemove } from "./scene.js";
 import { connect, send, fetchCheckpoints, fetchTrainingStatus, fetchLossHistory } from "./network.js";
+import { DEFAULT_BINDINGS, loadBindings, saveBindings, validateBindings } from "./camera-bindings.js";
+import { setCameraBindings } from "./scene.js";
 
 // ── State ────────────────────────────────────────────────────────
 let board = createEmptyBoard();
@@ -35,6 +37,8 @@ let viewIndex = null;    // null = live (latest), number = viewing history
 // Track pending human move for logging to history
 let pendingHumanMove = null; // {action, playerColor} or null
 
+let activeGameMode = null; // Set when a new_game message is sent; reflects the running game's mode.
+
 // ── DOM refs ─────────────────────────────────────────────────────
 const whiteReservesEl = document.getElementById("white-reserves");
 const blackReservesEl = document.getElementById("black-reserves");
@@ -45,6 +49,18 @@ const selModeEl = document.getElementById("sel-mode");
 const selDifficultyEl = document.getElementById("sel-difficulty");
 const selColorEl = document.getElementById("sel-color");
 const btnNewGameEl = document.getElementById("btn-new-game");
+const btnUndoMoveEl = document.getElementById("btn-undo-move");
+const camToggleEl = document.getElementById("cam-controls-toggle");
+const camCaretEl = document.getElementById("cam-controls-caret");
+const camBodyEl = document.getElementById("cam-controls-body");
+const camMouseEls = {
+  left: document.getElementById("cam-mouse-left"),
+  middle: document.getElementById("cam-mouse-middle"),
+  right: document.getElementById("cam-mouse-right"),
+};
+const camWarningEl = document.getElementById("cam-bindings-warning");
+const camKeyBtnEls = Array.from(document.querySelectorAll(".cam-key-btn"));
+const camResetEl = document.getElementById("cam-reset-defaults");
 const groupDifficultyEl = document.getElementById("group-difficulty");
 const groupColorEl = document.getElementById("group-color");
 const btnDoneRemovingEl = document.getElementById("btn-done-removing");
@@ -162,6 +178,26 @@ function clearMoveHistory() {
   viewIndex = null;
   updateNavButtons();
   updateMovePosition();
+  updateUndoButtonVisibility();
+}
+
+function retractLastMoveFromHistory() {
+  // Drop the last filled move cell. If the row only had a white cell, remove the row.
+  if (!currentMoveRow) return;
+  const blackCell = currentMoveRow.querySelector(".move-cell.black-move");
+  if (blackCell) {
+    blackCell.className = "move-cell placeholder";
+    blackCell.textContent = "…";
+    blackCell.removeAttribute("data-idx");
+    blackCell.replaceWith(blackCell.cloneNode(true)); // strip listeners
+    if (moveCount > 0) moveCount--;
+    return;
+  }
+  // No black cell yet -> drop the whole row, decrement turn number.
+  currentMoveRow.remove();
+  turnNumber = Math.max(0, turnNumber - 1);
+  currentMoveRow = moveHistoryEl.lastElementChild || null;
+  if (moveCount > 0) moveCount--;
 }
 
 // ── Move navigation helpers ──────────────────────────────────────
@@ -225,6 +261,7 @@ function updateNavButtons() {
   }
 
   updateMovePosition();
+  updateUndoButtonVisibility();
 }
 
 function highlightMoveEntry(idx) {
@@ -271,6 +308,15 @@ function updateMovePosition() {
   movePositionEl.textContent = `Move ${pos} / ${total}`;
 }
 
+function updateUndoButtonVisibility() {
+  if (!btnUndoMoveEl) return;
+  const inHvH = activeGameMode === "human_vs_human";
+  const hasMoves = boardSnapshots.length > 1;
+  const allowed = inHvH && hasMoves && !gameOver && !isViewingHistory() && !removalPhase && pendingHumanMove === null;
+  btnUndoMoveEl.classList.toggle("hidden", !inHvH);
+  btnUndoMoveEl.disabled = !allowed;
+}
+
 // ── UI state updates ─────────────────────────────────────────────
 
 function updateTurnUI(turn) {
@@ -308,6 +354,7 @@ function updateModeVisibility() {
     groupSpeedEl.classList.add("hidden");
     groupSearchItersEl.classList.add("hidden");
   }
+  updateUndoButtonVisibility();
 }
 
 // ── Checkpoint loading ───────────────────────────────────────────
@@ -464,6 +511,25 @@ function onSphereClick(level, row, col, player) {
 function handleMessage(msg) {
   switch (msg.type) {
     case "state": {
+      if (msg.take_back) {
+        // Pop twice: the just-undone move AND the previous tail snapshot,
+        // because the fall-through `saveSnapshot(msg...)` below will re-push
+        // the rolled-back state (which equals the previous tail).
+        if (boardSnapshots.length < 2) {
+          console.warn("[take_back] unexpected snapshot length", boardSnapshots.length);
+        }
+        boardSnapshots.pop();
+        boardSnapshots.pop();
+        retractLastMoveFromHistory();
+        pendingHumanMove = null;
+        viewIndex = null;
+        gameOver = false;
+        updateNavButtons();
+        updateMovePosition();
+        updateUndoButtonVisibility();
+        // Fall through: the rest of the state branch updates board/turn/reserves
+        // from msg as usual, which is exactly what we want.
+      }
       gameOver = false;
       removalPhase = false;
       removablePieces = [];
@@ -574,6 +640,7 @@ function handleMessage(msg) {
           setStatus(`${msg.turn}'s turn`, "info", 3000);
         }
       }
+      updateUndoButtonVisibility();
       break;
     }
 
@@ -605,6 +672,7 @@ function handleMessage(msg) {
             "info"
           );
           if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
+          updateUndoButtonVisibility();
         });
       } else {
         // Subsequent removal (after first piece removed) — skip the flash
@@ -618,6 +686,7 @@ function handleMessage(msg) {
           "info"
         );
         if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
+        updateUndoButtonVisibility();
       }
       break;
     }
@@ -671,6 +740,7 @@ function handleMessage(msg) {
       } else {
         setStatus(`Game over: ${msg.winner} wins! (${reasonText})`, "success");
       }
+      updateUndoButtonVisibility();
       break;
     }
 
@@ -735,8 +805,10 @@ function startNewGame() {
     payload.search_iterations = parseInt(selSearchItersEl.value);
   }
 
+  activeGameMode = mode;
   send(payload);
   setStatus("Starting new game...", "info", 2000);
+  updateUndoButtonVisibility();
 }
 
 // ── Training Dashboard ───────────────────────────────────────────
@@ -1156,6 +1228,13 @@ function main() {
   // UI event listeners
   selModeEl.addEventListener("change", updateModeVisibility);
   btnNewGameEl.addEventListener("click", startNewGame);
+  btnUndoMoveEl.addEventListener("click", () => {
+    if (btnUndoMoveEl.disabled) return;
+    if (pendingHumanMove !== null) return; // wait for the in-flight move to resolve first
+    btnUndoMoveEl.disabled = true;          // optimistic disable; refreshed on inbound state
+    send({ type: "take_back" });
+    setStatus("Taking back...", "info", 1500);
+  });
   btnDoneRemovingEl.addEventListener("click", () => {
     if (removalPhase) {
       send({ type: "skip_removal" });
@@ -1247,6 +1326,78 @@ function main() {
       });
     }
   }
+
+  // ── Camera bindings UI ──────────────────────────────────────────
+  let camBindings = loadBindings();
+  let camCapturingKey = null; // "forward"|...|null
+
+  function paintCamUI() {
+    for (const btn of ["left", "middle", "right"]) {
+      camMouseEls[btn].value = camBindings.mouse[btn];
+    }
+    for (const el of camKeyBtnEls) {
+      const which = el.dataset.key;
+      el.textContent = camBindings.fly[which];
+      el.classList.toggle("capturing", camCapturingKey === which);
+    }
+    // Warnings
+    const flyCount = Object.values(camBindings.mouse).filter((v) => v === "fly").length;
+    const hasRotate = Object.values(camBindings.mouse).some((v) => v === "orbit" || v === "fly");
+    const warnings = [];
+    if (flyCount > 1) warnings.push("Multiple buttons set to Fly; only one will activate fly mode.");
+    if (!hasRotate) warnings.push("No button can rotate the camera (assign Orbit or Fly).");
+    camWarningEl.textContent = warnings.join(" ");
+  }
+
+  function persistAndApply() {
+    if (!validateBindings(camBindings)) {
+      camBindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+    }
+    saveBindings(camBindings);
+    setCameraBindings(camBindings);
+    paintCamUI();
+  }
+
+  camToggleEl.addEventListener("click", () => {
+    const open = !camBodyEl.classList.contains("hidden");
+    camBodyEl.classList.toggle("hidden", open);
+    camCaretEl.innerHTML = open ? "▸" : "▾";
+  });
+
+  for (const btn of ["left", "middle", "right"]) {
+    camMouseEls[btn].addEventListener("change", (e) => {
+      camBindings.mouse[btn] = e.target.value;
+      persistAndApply();
+    });
+  }
+
+  for (const el of camKeyBtnEls) {
+    el.addEventListener("click", () => {
+      camCapturingKey = el.dataset.key;
+      paintCamUI();
+    });
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (!camCapturingKey) return;
+    if (e.code === "Escape") {
+      camCapturingKey = null;
+      paintCamUI();
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation(); // don't trigger nav shortcuts (← → Space Home End)
+    camBindings.fly[camCapturingKey] = e.code;
+    camCapturingKey = null;
+    persistAndApply();
+  }, true); // capture phase so the key isn't consumed by fly-mode or nav handlers
+
+  camResetEl.addEventListener("click", () => {
+    camBindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+    persistAndApply();
+  });
+
+  paintCamUI();
 
   // Initial mode visibility
   updateModeVisibility();

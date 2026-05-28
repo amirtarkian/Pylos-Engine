@@ -12,7 +12,8 @@
  */
 
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { createCameraControls } from "./camera-controls.js";
+import { loadBindings } from "./camera-bindings.js";
 import { LEVEL_SIZES, boardToWorld } from "./game.js";
 
 // ── Internal state ───────────────────────────────────────────────
@@ -84,15 +85,12 @@ export function init(container) {
   camera.position.set(6, 8, 6);
   camera.lookAt(0, 1.5, 0);
 
-  // Controls
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.target.set(0, 1.5, 0);
-  controls.minDistance = 4;
-  controls.maxDistance = 15;
-  controls.maxPolarAngle = Math.PI * 0.44; // ~80 degrees
-  controls.update();
+  // Controls (Unity-style: Left=Orbit, Middle=Pan, Right=Fly)
+  controls = createCameraControls(camera, renderer.domElement, {
+    bindings: loadBindings(),
+  });
+  controls.orbit.target.set(0, 1.5, 0);
+  controls.orbit.update();
 
   // Raycaster
   raycaster = new THREE.Raycaster();
@@ -193,6 +191,7 @@ export function init(container) {
   // ── Events ──────────────────────────────────────────────────
   renderer.domElement.addEventListener("pointermove", onPointerMove, false);
   renderer.domElement.addEventListener("pointerdown", onPointerDown, false);
+  renderer.domElement.addEventListener("pointerup", onPointerUp, false);
 
   // Resize
   window.addEventListener("resize", () => {
@@ -499,9 +498,30 @@ function onPointerMove(event) {
   renderer.domElement.style.cursor = "default";
 }
 
+// Track drag distance so camera drags don't trigger piece placement.
+let _pointerDownState = null; // { x, y }
+const DRAG_PX_THRESHOLD = 4;
+
 function onPointerDown(event) {
-  // Ignore right-click / middle-click
-  if (event.button !== 0) return;
+  if (event.button !== 0) {
+    _pointerDownState = null;
+    return;
+  }
+  _pointerDownState = { x: event.clientX, y: event.clientY };
+}
+
+function onPointerUp(event) {
+  if (event.button !== 0 || _pointerDownState === null) return;
+  // If the camera is in Fly mode (pointer locked), clientX/Y is stale.
+  // Drop the recorded down-state and don't fire a placement.
+  if (controls && controls.isFlying) {
+    _pointerDownState = null;
+    return;
+  }
+  const dx = event.clientX - _pointerDownState.x;
+  const dy = event.clientY - _pointerDownState.y;
+  _pointerDownState = null;
+  if (dx * dx + dy * dy > DRAG_PX_THRESHOLD * DRAG_PX_THRESHOLD) return;
 
   const intersects = _getIntersects(event);
   if (intersects.length === 0) return;
@@ -577,4 +597,8 @@ function _animate() {
 
   controls.update();
   renderer.render(scene, camera);
+}
+
+export function setCameraBindings(bindings) {
+  if (controls && controls.setBindings) controls.setBindings(bindings);
 }

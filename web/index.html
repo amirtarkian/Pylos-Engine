@@ -168,6 +168,14 @@
       transform: translateY(0);
     }
 
+    #btn-undo-move {
+      margin-top: 8px;
+    }
+    #btn-undo-move:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     /* ── Move History (chess-style paired layout) ────────────── */
     #move-history-wrapper {
       flex: 1;
@@ -839,7 +847,7 @@
 
     <div class="control-group">
       <button id="btn-new-game">New Game</button>
-      <button id="btn-undo-move" class="hidden" style="margin-top:8px;">Undo Move</button>
+      <button id="btn-undo-move" class="hidden">Undo Move</button>
     </div>
 
     <div id="move-history-wrapper">

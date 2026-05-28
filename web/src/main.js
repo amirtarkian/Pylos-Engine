@@ -297,7 +297,7 @@ function updateUndoButtonVisibility() {
   if (!btnUndoMoveEl) return;
   const inHvH = selModeEl.value === "human_vs_human";
   const hasMoves = boardSnapshots.length > 1;
-  const allowed = inHvH && hasMoves && !gameOver && !isViewingHistory();
+  const allowed = inHvH && hasMoves && !gameOver && !isViewingHistory() && !removalPhase;
   btnUndoMoveEl.classList.toggle("hidden", !inHvH);
   btnUndoMoveEl.disabled = !allowed;
 }
@@ -500,6 +500,9 @@ function handleMessage(msg) {
         // Pop twice: the just-undone move AND the previous tail snapshot,
         // because the fall-through `saveSnapshot(msg...)` below will re-push
         // the rolled-back state (which equals the previous tail).
+        if (boardSnapshots.length < 2) {
+          console.warn("[take_back] unexpected snapshot length", boardSnapshots.length);
+        }
         boardSnapshots.pop();
         boardSnapshots.pop();
         retractLastMoveFromHistory();
@@ -622,6 +625,7 @@ function handleMessage(msg) {
           setStatus(`${msg.turn}'s turn`, "info", 3000);
         }
       }
+      updateUndoButtonVisibility();
       break;
     }
 
@@ -653,6 +657,7 @@ function handleMessage(msg) {
             "info"
           );
           if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
+          updateUndoButtonVisibility();
         });
       } else {
         // Subsequent removal (after first piece removed) — skip the flash
@@ -666,6 +671,7 @@ function handleMessage(msg) {
           "info"
         );
         if (btnDoneRemovingEl) btnDoneRemovingEl.classList.remove("hidden");
+        updateUndoButtonVisibility();
       }
       break;
     }
@@ -719,6 +725,7 @@ function handleMessage(msg) {
       } else {
         setStatus(`Game over: ${msg.winner} wins! (${reasonText})`, "success");
       }
+      updateUndoButtonVisibility();
       break;
     }
 
@@ -1207,6 +1214,8 @@ function main() {
   btnNewGameEl.addEventListener("click", startNewGame);
   btnUndoMoveEl.addEventListener("click", () => {
     if (btnUndoMoveEl.disabled) return;
+    if (pendingHumanMove !== null) return; // wait for the in-flight move to resolve first
+    btnUndoMoveEl.disabled = true;          // optimistic disable; refreshed on inbound state
     send({ type: "take_back" });
     setStatus("Taking back...", "info", 1500);
   });

@@ -175,6 +175,7 @@ function retractLastMoveFromHistory() {
     blackCell.textContent = "…";
     blackCell.removeAttribute("data-idx");
     blackCell.replaceWith(blackCell.cloneNode(true)); // strip listeners
+    if (moveCount > 0) moveCount--;
     return;
   }
   // No black cell yet -> drop the whole row, decrement turn number.
@@ -496,6 +497,10 @@ function handleMessage(msg) {
   switch (msg.type) {
     case "state": {
       if (msg.take_back) {
+        // Pop twice: the just-undone move AND the previous tail snapshot,
+        // because the fall-through `saveSnapshot(msg...)` below will re-push
+        // the rolled-back state (which equals the previous tail).
+        boardSnapshots.pop();
         boardSnapshots.pop();
         retractLastMoveFromHistory();
         pendingHumanMove = null;

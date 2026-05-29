@@ -7,6 +7,7 @@ Provides:
   - /src/*                  — serves web/src/ static files
   - WS  /game               — WebSocket game session
 """
+from __future__ import annotations
 
 import sys
 import os
@@ -94,8 +95,9 @@ async def get_checkpoints():
             with open(manifest_path, "r") as f:
                 data = json.load(f)
                 for cp in data.get("checkpoints", []):
+                    if not os.path.isfile(os.path.join(ckpt_dir, cp["file"])):
+                        continue
                     cp["version"] = label
-                    # Prefix non-v1 paths so loader can resolve them
                     if label != "v1":
                         dirname = os.path.basename(ckpt_dir)
                         cp["file"] = dirname + "/" + cp["file"]

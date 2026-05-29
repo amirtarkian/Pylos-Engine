@@ -608,6 +608,40 @@
       background: rgba(74, 108, 247, 0.2);
     }
 
+    /* ── Hint button states ───────────────────────────────────── */
+    #btn-hint.hint-loading {
+      opacity: 0.7;
+      animation: hintPulse 1.5s ease-in-out infinite;
+    }
+    #btn-hint.hint-active {
+      background: rgba(74, 108, 247, 0.25);
+      border-color: rgba(74, 108, 247, 0.5);
+      color: #8fa4ff;
+    }
+    @keyframes hintPulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.9; }
+    }
+
+    /* ── Hint tooltip ─────────────────────────────────────────── */
+    #hint-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(20, 20, 45, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 6px 10px;
+      max-width: 160px;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 11px;
+      color: #d4d8e8;
+      z-index: 20;
+      display: none;
+      white-space: nowrap;
+    }
+
     /* ── Hidden helper ─────────────────────────────────────────── */
     .hidden {
       display: none !important;
@@ -895,6 +929,18 @@
       <button id="btn-undo-move" class="hidden">Undo Move</button>
     </div>
 
+    <div class="control-group" id="group-hint">
+      <label>Hint</label>
+      <div style="display:flex;gap:6px;">
+        <button id="btn-hint" style="flex:2;">Hint</button>
+        <select id="sel-hint-level" style="flex:1;font-size:11px;">
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="expert" selected>Expert</option>
+        </select>
+      </div>
+    </div>
+
     <div id="move-history-wrapper">
       <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a82a0;font-weight:600;">
         Move History
@@ -967,6 +1013,10 @@
            transition:background 0.2s,transform 0.15s;pointer-events:auto;">
     Done Removing
   </button>
+
+  <!-- Status bar -->
+  <!-- Hint tooltip (positioned via JS) -->
+  <div id="hint-tooltip"></div>
 
   <!-- Status bar -->
   <div id="status-bar" class="glass">Ready</div>

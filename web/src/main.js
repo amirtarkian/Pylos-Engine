@@ -5,8 +5,8 @@
  */
 
 import { createEmptyBoard, updateBoardFromState } from "./game.js";
-import { init as initScene, setCallbacks, updateBoard, highlightSphere, clearHighlights, flashFormation, flashAndRemove } from "./scene.js";
-import { connect, send, fetchCheckpoints, fetchTrainingStatus, fetchLossHistory } from "./network.js";
+import { init as initScene, setCallbacks, updateBoard, highlightSphere, clearHighlights, flashFormation, flashAndRemove, showHints, clearHints, isHintActive } from "./scene.js";
+import { connect, send, sendHint, fetchCheckpoints, fetchTrainingStatus, fetchLossHistory } from "./network.js";
 import { DEFAULT_BINDINGS, loadBindings, saveBindings, validateBindings } from "./camera-bindings.js";
 import { setCameraBindings } from "./scene.js";
 
@@ -39,6 +39,11 @@ let pendingHumanMove = null; // {action, playerColor} or null
 
 let activeGameMode = null; // Set when a new_game message is sent; reflects the running game's mode.
 
+// Hint state
+let hintComputing = false;
+let hintShown = false;
+let allHintMoves = [];  // Full server response; client filters by detail level
+
 // ── DOM refs ─────────────────────────────────────────────────────
 const whiteReservesEl = document.getElementById("white-reserves");
 const blackReservesEl = document.getElementById("black-reserves");
@@ -64,6 +69,11 @@ const camResetEl = document.getElementById("cam-reset-defaults");
 const groupDifficultyEl = document.getElementById("group-difficulty");
 const groupColorEl = document.getElementById("group-color");
 const btnDoneRemovingEl = document.getElementById("btn-done-removing");
+
+// Hint controls
+const btnHintEl = document.getElementById("btn-hint");
+const selHintLevelEl = document.getElementById("sel-hint-level");
+const hintTooltipEl = document.getElementById("hint-tooltip");
 
 // Dual AI selectors
 const groupAiWhiteEl = document.getElementById("group-ai-white");
@@ -317,6 +327,70 @@ function updateUndoButtonVisibility() {
   btnUndoMoveEl.disabled = !allowed;
 }
 
+// ── Hint helpers ────────────────────────────────────────────────
+
+function filterHintMoves(allMoves, level) {
+  if (!allMoves || allMoves.length === 0) return [];
+  if (level === "beginner") return allMoves.slice(0, 1);
+  if (level === "intermediate") return allMoves.slice(0, 3);
+  return allMoves.filter(m => m.visits >= 2);
+}
+
+function dismissHints() {
+  clearHints();
+  hintShown = false;
+  allHintMoves = [];
+  updateHintButton();
+  if (hintTooltipEl) hintTooltipEl.style.display = "none";
+  updateBoard(board, legalMoves);
+}
+
+function updateHintButton() {
+  if (!btnHintEl) return;
+  const isAiTurn = activeGameMode === "human_vs_ai" &&
+    currentTurn !== (document.getElementById("sel-color")?.value || "white");
+  const disabled = gameOver || isViewingHistory() || removalPhase ||
+    isAiTurn || activeGameMode === "ai_vs_ai" || hintComputing;
+
+  btnHintEl.disabled = disabled;
+  btnHintEl.classList.remove("hint-loading", "hint-active");
+
+  if (hintComputing) {
+    btnHintEl.textContent = "Thinking...";
+    btnHintEl.classList.add("hint-loading");
+  } else if (hintShown) {
+    btnHintEl.textContent = "Clear Hint";
+    btnHintEl.classList.add("hint-active");
+  } else {
+    btnHintEl.textContent = "Hint";
+  }
+}
+
+function requestHint() {
+  if (hintShown) {
+    dismissHints();
+    return;
+  }
+  if (hintComputing || gameOver || isViewingHistory() || removalPhase) return;
+  hintComputing = true;
+  updateHintButton();
+  sendHint();
+}
+
+function onHintHover(moveData, screenX, screenY) {
+  if (!hintTooltipEl) return;
+  if (!moveData) {
+    hintTooltipEl.style.display = "none";
+    return;
+  }
+  const pct = Math.round(moveData.score * 100);
+  const wr = Math.round(moveData.win_rate * 100);
+  hintTooltipEl.textContent = `${pct}% | ${moveData.visits} visits | ${wr}% win`;
+  hintTooltipEl.style.display = "block";
+  hintTooltipEl.style.left = `${screenX + 12}px`;
+  hintTooltipEl.style.top = `${screenY - 20}px`;
+}
+
 // ── UI state updates ─────────────────────────────────────────────
 
 function updateTurnUI(turn) {
@@ -534,6 +608,7 @@ function handleMessage(msg) {
       removalPhase = false;
       removablePieces = [];
       if (btnDoneRemovingEl) btnDoneRemovingEl.classList.add("hidden");
+      if (hintShown) dismissHints();
 
       // Save board snapshot for navigation
       saveSnapshot(msg.board, msg.turn, msg.reserves);
@@ -757,8 +832,28 @@ function handleMessage(msg) {
       break;
     }
 
+    case "hint_result": {
+      hintComputing = false;
+      allHintMoves = msg.moves || [];
+      const filtered = filterHintMoves(allHintMoves, selHintLevelEl.value);
+      if (filtered.length > 0) {
+        showHints(filtered);
+        hintShown = true;
+        const ms = msg.thinking_time_ms || 0;
+        setStatus(`Hint: ${filtered.length} move${filtered.length > 1 ? "s" : ""} (${(ms / 1000).toFixed(1)}s)`, "info", 4000);
+      } else {
+        setStatus("No hint moves available", "info", 3000);
+      }
+      updateHintButton();
+      break;
+    }
+
     case "error": {
       setStatus(`Error: ${msg.message}`, "error", 4000);
+      if (hintComputing) {
+        hintComputing = false;
+        updateHintButton();
+      }
       break;
     }
 
@@ -772,6 +867,7 @@ function handleMessage(msg) {
 function startNewGame() {
   const mode = selModeEl.value;
   clearMoveHistory();
+  dismissHints();
   gameOver = false;
   removalPhase = false;
   removablePieces = [];
@@ -1223,7 +1319,7 @@ function main() {
   // Init 3D scene
   const container = document.getElementById("canvas-container");
   initScene(container);
-  setCallbacks(onPositionClick, onSphereClick);
+  setCallbacks(onPositionClick, onSphereClick, onHintHover);
 
   // UI event listeners
   selModeEl.addEventListener("change", updateModeVisibility);
@@ -1241,6 +1337,18 @@ function main() {
       setStatus("Skipping remaining removals...", "info", 2000);
     }
   });
+
+  // Hint button + detail level
+  btnHintEl.addEventListener("click", requestHint);
+  selHintLevelEl.addEventListener("change", () => {
+    localStorage.setItem("pylos-hint-level", selHintLevelEl.value);
+    if (hintShown && allHintMoves.length > 0) {
+      const filtered = filterHintMoves(allHintMoves, selHintLevelEl.value);
+      showHints(filtered);
+    }
+  });
+  const savedLevel = localStorage.getItem("pylos-hint-level");
+  if (savedLevel) selHintLevelEl.value = savedLevel;
 
   // Move navigation buttons
   navFirstEl.addEventListener("click", () => navigateToMove(0));
@@ -1300,6 +1408,9 @@ function main() {
     } else if (e.key === " ") {
       e.preventDefault();
       navPauseEl.click();
+    } else if (e.key === "h" || e.key === "H") {
+      e.preventDefault();
+      requestHint();
     }
   });
 

@@ -7,6 +7,7 @@ Provides:
   - /src/*                  — serves web/src/ static files
   - WS  /game               — WebSocket game session
 """
+from __future__ import annotations
 
 import sys
 import os
@@ -28,7 +29,8 @@ from collections import defaultdict
 from game import PylosGame
 from models import PylosNetwork
 from agents import AlphaZeroAgent
-from mcts import play as mcts_play
+from mcts import play as mcts_play, search as mcts_search
+import copy
 
 # ---------------------------------------------------------------------------
 # Game loop limits
@@ -69,6 +71,39 @@ TRAINING_RUNS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Hint system: shared checkpoint path helper + cached hint agent
+# ---------------------------------------------------------------------------
+
+def _resolve_checkpoint_path(label: str, ckpt_dir: str, filename: str) -> str:
+    if label == "v1":
+        return filename
+    return os.path.basename(ckpt_dir) + "/" + filename
+
+
+def _find_best_checkpoint() -> str | None:
+    best_elo, best_file = -1, None
+    for label, ckpt_dir in TRAINING_RUNS:
+        manifest_path = os.path.join(ckpt_dir, "manifest.json")
+        if not os.path.isfile(manifest_path):
+            continue
+        with open(manifest_path) as f:
+            data = json.load(f)
+        for cp in data.get("checkpoints", []):
+            if not os.path.isfile(os.path.join(ckpt_dir, cp["file"])):
+                continue
+            if cp.get("elo", 0) > best_elo:
+                best_elo = cp["elo"]
+                best_file = _resolve_checkpoint_path(label, ckpt_dir, cp["file"])
+    return best_file
+
+
+_hint_agent: AlphaZeroAgent | None = None
+_hint_agent_lock = asyncio.Lock()
+_hint_cache: dict[str, list] = {}
+_HINT_CACHE_MAX = 256
+_HINT_SEARCH_ITERATIONS = 128
+
+# ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 
@@ -94,11 +129,10 @@ async def get_checkpoints():
             with open(manifest_path, "r") as f:
                 data = json.load(f)
                 for cp in data.get("checkpoints", []):
+                    if not os.path.isfile(os.path.join(ckpt_dir, cp["file"])):
+                        continue
                     cp["version"] = label
-                    # Prefix non-v1 paths so loader can resolve them
-                    if label != "v1":
-                        dirname = os.path.basename(ckpt_dir)
-                        cp["file"] = dirname + "/" + cp["file"]
+                    cp["file"] = _resolve_checkpoint_path(label, ckpt_dir, cp["file"])
                     all_checkpoints.append(cp)
 
     return {"checkpoints": all_checkpoints}
@@ -531,10 +565,11 @@ async def game_ws(ws: WebSocket):
     step_event = asyncio.Event()  # triggers one AI move while paused
     shared_delay = [1500]  # mutable container so AI loop sees updates
 
-    # Per-session action history for take-back. Each entry is either an int
-    # (action index applied via PylosGame.step) or one of the sentinel strings
-    # "remove:L,R,C" / "skip_removal".
+    # Per-session action history for take-back.
     action_stack: list = []
+
+    # Hint debounce: prevents concurrent MCTS hint computations per session
+    hint_computing = False
 
     try:
         while True:
@@ -816,6 +851,74 @@ async def game_ws(ws: WebSocket):
                 state = make_state_msg(game)
                 state["take_back"] = True
                 await ws.send_json(state)
+
+            # ----------------------------------------------------------
+            # hint
+            # ----------------------------------------------------------
+            elif msg_type == "hint":
+                global _hint_agent
+                if game is None:
+                    await ws.send_json({"type": "error", "message": "No active game"})
+                    continue
+                if game.pending_removal:
+                    await ws.send_json({"type": "error", "message": "Hints not available during removal"})
+                    continue
+                if hint_computing:
+                    await ws.send_json({"type": "error", "message": "Hint already computing"})
+                    continue
+
+                hint_computing = True
+                t0 = time.monotonic()
+                try:
+                    async with _hint_agent_lock:
+                        if _hint_agent is None:
+                            best_ckpt = _find_best_checkpoint()
+                            if best_ckpt is None:
+                                await ws.send_json({"type": "error", "message": "No checkpoints available"})
+                                continue
+                            _hint_agent = load_ai_agent(best_ckpt)
+
+                    board_hash = _board_hash(game)
+                    if board_hash in _hint_cache:
+                        all_moves = _hint_cache[board_hash]
+                    else:
+                        game_copy = copy.deepcopy(game)
+                        root = await asyncio.to_thread(
+                            mcts_search, game_copy,
+                            eval_fn=_hint_agent.eval_fn,
+                            iterations=_HINT_SEARCH_ITERATIONS,
+                        )
+                        if root.children is None:
+                            await ws.send_json({
+                                "type": "hint_result", "moves": [],
+                                "thinking_time_ms": int((time.monotonic() - t0) * 1000),
+                            })
+                            continue
+
+                        visits = root.children_visits
+                        scores = visits / visits.sum()
+                        all_moves = []
+                        for i, action in enumerate(root.children_actions):
+                            move_json = _action_to_json(game, action)
+                            move_json["score"] = float(scores[i])
+                            move_json["visits"] = int(visits[i])
+                            move_json["win_rate"] = float(root.children_values[i])
+                            move_json["action"] = int(action)
+                            all_moves.append(move_json)
+                        all_moves.sort(key=lambda m: m["score"], reverse=True)
+
+                        if len(_hint_cache) >= _HINT_CACHE_MAX:
+                            oldest_key = next(iter(_hint_cache))
+                            del _hint_cache[oldest_key]
+                        _hint_cache[board_hash] = all_moves
+
+                    await ws.send_json({
+                        "type": "hint_result",
+                        "moves": all_moves,
+                        "thinking_time_ms": int((time.monotonic() - t0) * 1000),
+                    })
+                finally:
+                    hint_computing = False
 
             else:
                 await ws.send_json({"type": "error", "message": f"Unknown message type: {msg_type}"})

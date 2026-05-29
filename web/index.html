@@ -95,6 +95,21 @@
       flex-direction: column;
       gap: 14px;
       max-height: calc(100vh - 32px);
+      overflow-y: auto;
+    }
+
+    #side-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #side-panel::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 2px;
+      transition: background 0.3s;
+    }
+
+    #side-panel:hover::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
     }
 
     #side-panel h2 {
@@ -193,8 +208,7 @@
 
     /* ── Move History (chess-style paired layout) ────────────── */
     #move-history-wrapper {
-      flex: 1;
-      min-height: 0;
+      flex-shrink: 0;
       display: flex;
       flex-direction: column;
       gap: 5px;
@@ -355,7 +369,23 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
       transition: opacity 0.3s;
+    }
+
+    #training-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #training-panel::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 2px;
+      transition: background 0.3s;
+    }
+
+    #training-panel:hover::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
     }
 
     #training-panel h2 {
@@ -576,6 +606,40 @@
 
     .ckpt-entry .ckpt-play-btn:hover {
       background: rgba(74, 108, 247, 0.2);
+    }
+
+    /* ── Hint button states ───────────────────────────────────── */
+    #btn-hint.hint-loading {
+      opacity: 0.7;
+      animation: hintPulse 1.5s ease-in-out infinite;
+    }
+    #btn-hint.hint-active {
+      background: rgba(74, 108, 247, 0.25);
+      border-color: rgba(74, 108, 247, 0.5);
+      color: #8fa4ff;
+    }
+    @keyframes hintPulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.9; }
+    }
+
+    /* ── Hint tooltip ─────────────────────────────────────────── */
+    #hint-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(20, 20, 45, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      font-size: 11px;
+      color: #d4d8e8;
+      z-index: 20;
+      display: none;
+      white-space: nowrap;
+      width: max-content;
     }
 
     /* ── Hidden helper ─────────────────────────────────────────── */
@@ -865,6 +929,18 @@
       <button id="btn-undo-move" class="hidden">Undo Move</button>
     </div>
 
+    <div class="control-group" id="group-hint">
+      <label>Hint</label>
+      <div style="display:flex;gap:6px;">
+        <button id="btn-hint" style="flex:2;">Hint</button>
+        <select id="sel-hint-level" style="flex:1;font-size:11px;">
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="expert" selected>Expert</option>
+        </select>
+      </div>
+    </div>
+
     <div id="move-history-wrapper">
       <label style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#7a82a0;font-weight:600;">
         Move History
@@ -879,7 +955,7 @@
         <button id="nav-last" title="Live / Latest (End)" class="live-active">&#9654;|</button>
       </div>
     </div>
-    <div id="camera-controls-card" class="control-group" style="margin-top:12px;">
+    <div id="camera-controls-card" class="control-group" style="margin-top:12px;flex-shrink:0;">
       <button id="cam-controls-toggle" class="glass" style="
         width:100%;padding:8px;display:flex;justify-content:space-between;
         align-items:center;background:transparent;color:#d4d8e8;
@@ -937,6 +1013,10 @@
            transition:background 0.2s,transform 0.15s;pointer-events:auto;">
     Done Removing
   </button>
+
+  <!-- Status bar -->
+  <!-- Hint tooltip (positioned via JS) -->
+  <div id="hint-tooltip"></div>
 
   <!-- Status bar -->
   <div id="status-bar" class="glass">Ready</div>

@@ -10,11 +10,12 @@ import time
 import multiprocessing as mp
 
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import torch
 import numpy as np
 from game import PylosGame
-from models import PylosNetwork
+from models import GameNetwork
 from train import _run_selfplay, _init_worker, _batched_selfplay
 
 # ── Config ────────────────────────────────────────────────────────
@@ -110,7 +111,7 @@ def bench_batched_cpu(model, batch_size):
 
 def main():
     game = PylosGame()
-    model = PylosNetwork(game.observation_shape, game.action_space)
+    model = GameNetwork(game.observation_shape, game.action_space)
 
     num_workers = min(os.cpu_count() - 2, 8)
 

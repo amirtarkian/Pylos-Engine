@@ -22,7 +22,7 @@ class ResidualBlock(nn.Module):
         return out + residual
 
 
-class PylosNetwork(nn.Module):
+class GameNetwork(nn.Module):
     def __init__(self, input_shape, action_space, hidden=256, num_blocks=6, value_hidden=64, policy_hidden=128):
         super().__init__()
 
@@ -111,3 +111,7 @@ class PylosNetwork(nn.Module):
             x = self._backbone(observation)
             p = F.relu(self.policy_bn(self.policy_fc1(x)))
             return F.softmax(self.policy_fc2(p), dim=-1).squeeze(0)
+
+
+# Alias for checkpoint compatibility
+PylosNetwork = GameNetwork

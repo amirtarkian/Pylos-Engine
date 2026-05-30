@@ -1,20 +1,26 @@
 """
-Evaluate Pylos AlphaZero checkpoints — vs random and vs other models.
+Evaluate AlphaZero checkpoints — vs random and vs other models.
 """
 
 import sys
 import os
 import math
 import argparse
+import importlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
 import torch
-from game import PylosGame
-from models import PylosNetwork
+from models import GameNetwork
 from agents import AlphaZeroAgent
 from mcts import play
+
+
+def _load_game_class(game_name):
+    mod = importlib.import_module(f"games.{game_name}")
+    return mod.GAME_CLASS
 
 
 MAX_EVAL_MOVES = 200  # prevent infinite games during evaluation
@@ -33,12 +39,15 @@ class RandomAgent:
         return np.ones(game.action_space, dtype=np.float32) / game.action_space
 
 
-def _load_agent(model_path):
+def _load_agent(model_path, game_cls=None):
     """Load a checkpoint into an AlphaZeroAgent on CPU.
 
     Reads model architecture from checkpoint metadata (V5+).
     Falls back to V4 defaults for older checkpoints.
     """
+    if game_cls is None:
+        game_cls = _load_game_class("pylos")
+
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
 
     # Read model config from checkpoint, or use V4 defaults
@@ -49,8 +58,8 @@ def _load_agent(model_path):
     policy_hidden = model_cfg.get("policy_hidden", 128)
     rich_obs = model_cfg.get("rich_obs", False)
 
-    game_tmp = PylosGame(rich_obs=rich_obs)
-    model = PylosNetwork(
+    game_tmp = game_cls(rich_obs=rich_obs)
+    model = GameNetwork(
         game_tmp.observation_shape, game_tmp.action_space,
         hidden=hidden, num_blocks=num_blocks,
         value_hidden=value_hidden, policy_hidden=policy_hidden,
@@ -66,14 +75,17 @@ def _load_agent(model_path):
     return AlphaZeroAgent(model, rich_obs=rich_obs)
 
 
-def _play_match(agent_a, agent_b, num_games, search_iterations=32, eval_noise=0.15):
+def _play_match(agent_a, agent_b, num_games, search_iterations=32, eval_noise=0.15,
+                game_cls=None):
     """Play a match between two agents, returning agent_a's win rate.
 
     Alternates colors each game. Draws count as 0.5 for both.
     Uses light Dirichlet noise (eval_noise) to break determinism
     so each game plays out differently.
     """
-    game = PylosGame()
+    if game_cls is None:
+        game_cls = _load_game_class("pylos")
+    game = game_cls()
     a_kwargs = {"search_iterations": search_iterations, "dirichlet_alpha": eval_noise}
     b_kwargs = {"search_iterations": search_iterations, "dirichlet_alpha": eval_noise}
 
@@ -118,23 +130,30 @@ def win_rate_to_elo(win_rate, opponent_elo):
     return opponent_elo + 400 * math.log10(clamped / (1 - clamped))
 
 
-def evaluate_checkpoint(model_path, num_games=50, search_iterations=32):
+def evaluate_checkpoint(model_path, num_games=50, search_iterations=32, game_cls=None):
     """Evaluate a checkpoint by playing against a RandomAgent.
 
     Returns win rate as a float between 0.0 and 1.0.
     """
-    agent = _load_agent(model_path)
-    return _play_match(agent, RandomAgent(), num_games, search_iterations)
+    if game_cls is None:
+        game_cls = _load_game_class("pylos")
+    agent = _load_agent(model_path, game_cls=game_cls)
+    return _play_match(agent, RandomAgent(), num_games, search_iterations,
+                       game_cls=game_cls)
 
 
-def evaluate_vs_model(model_path_a, model_path_b, num_games=50, search_iterations=32):
+def evaluate_vs_model(model_path_a, model_path_b, num_games=50, search_iterations=32,
+                      game_cls=None):
     """Play two checkpoints against each other.
 
     Returns model_a's win rate as a float between 0.0 and 1.0.
     """
-    agent_a = _load_agent(model_path_a)
-    agent_b = _load_agent(model_path_b)
-    return _play_match(agent_a, agent_b, num_games, search_iterations)
+    if game_cls is None:
+        game_cls = _load_game_class("pylos")
+    agent_a = _load_agent(model_path_a, game_cls=game_cls)
+    agent_b = _load_agent(model_path_b, game_cls=game_cls)
+    return _play_match(agent_a, agent_b, num_games, search_iterations,
+                       game_cls=game_cls)
 
 
 def assign_label(win_rate):
@@ -159,8 +178,10 @@ def assign_label(win_rate):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate a Pylos AlphaZero checkpoint")
+    parser = argparse.ArgumentParser(description="Evaluate an AlphaZero checkpoint")
     parser.add_argument("model_path", type=str, help="Path to the model .pth file")
+    parser.add_argument("--game", type=str, default="pylos",
+                        help="Game module name (default: pylos)")
     parser.add_argument("--games", type=int, default=50, help="Number of evaluation games")
     parser.add_argument(
         "--search-iterations", type=int, default=32,
@@ -168,12 +189,15 @@ def main():
     )
     args = parser.parse_args()
 
+    game_cls = _load_game_class(args.game)
+
     print(f"Evaluating {args.model_path} over {args.games} games "
           f"({args.search_iterations} search iterations)...")
     win_rate = evaluate_checkpoint(
         args.model_path,
         num_games=args.games,
         search_iterations=args.search_iterations,
+        game_cls=game_cls,
     )
     label = assign_label(win_rate)
     print(f"Win rate vs random: {win_rate:.2%}")

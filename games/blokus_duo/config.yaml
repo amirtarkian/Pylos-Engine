@@ -1,0 +1,27 @@
+game:
+  name: blokus_duo
+  display_name: Blokus Duo
+
+training:
+  selfplay_games: 2000
+  search_iterations: 64
+  batch_size: 32
+  replay_buffer_size: 512
+  epochs_per_game: 3
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  c_puct: 1.5
+  dirichlet_alpha: 0.15
+  dirichlet_weight: 0.25
+  temp_threshold: 20
+
+model:
+  hidden: 256
+  num_blocks: 6
+  value_hidden: 64
+  policy_hidden: 256
+
+checkpoints:
+  save_every: 50
+  eval_games: 20
+  directory: games/blokus_duo/checkpoints

@@ -5,7 +5,7 @@ import json
 import tempfile
 import torch
 from game import PylosGame
-from models import PylosNetwork
+from models import GameNetwork
 from agents import AlphaZeroAgentTrainer, AlphaZeroAgent
 from mcts import play as mcts_play, pit
 from evaluate import evaluate_checkpoint, assign_label, RandomAgent
@@ -15,7 +15,7 @@ class TestTrainSaveLoad:
     def test_full_pipeline(self):
         """Train 3 games, save checkpoint, load, verify inference works."""
         game = PylosGame()
-        model = PylosNetwork(game.observation_shape, game.action_space)
+        model = GameNetwork(game.observation_shape, game.action_space)
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
         agent = AlphaZeroAgentTrainer(model, optimizer, 64)
 
@@ -29,7 +29,7 @@ class TestTrainSaveLoad:
             agent.save_training_state(model_path, opt_path)
 
             # Load in fresh model
-            model2 = PylosNetwork(game.observation_shape, game.action_space)
+            model2 = GameNetwork(game.observation_shape, game.action_space)
             model2.load_state_dict(torch.load(model_path, map_location=model2.device, weights_only=True))
 
             # Verify inference
@@ -45,7 +45,7 @@ class TestTrainSaveLoad:
         """Verify checkpoint saving creates valid manifest.json."""
         with tempfile.TemporaryDirectory() as tmpdir:
             game = PylosGame()
-            model = PylosNetwork(game.observation_shape, game.action_space)
+            model = GameNetwork(game.observation_shape, game.action_space)
             optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
             agent = AlphaZeroAgentTrainer(model, optimizer, 64)
 
@@ -63,7 +63,7 @@ class TestMCTSPlay:
     def test_agent_can_play_full_game(self):
         """An AlphaZero agent (untrained) can play a complete game without crashing."""
         game = PylosGame()
-        model = PylosNetwork(game.observation_shape, game.action_space)
+        model = GameNetwork(game.observation_shape, game.action_space)
         agent = AlphaZeroAgent(model)
 
         moves = 0
@@ -80,7 +80,7 @@ class TestMCTSPlay:
     def test_pit_completes(self):
         """Two agents can play against each other."""
         game = PylosGame()
-        model = PylosNetwork(game.observation_shape, game.action_space)
+        model = GameNetwork(game.observation_shape, game.action_space)
         agent1 = AlphaZeroAgent(model)
         agent2 = AlphaZeroAgent(model)
 
@@ -98,7 +98,7 @@ class TestEvaluation:
         """Evaluate an untrained model (should have roughly 50% win rate vs random)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             game = PylosGame()
-            model = PylosNetwork(game.observation_shape, game.action_space)
+            model = GameNetwork(game.observation_shape, game.action_space)
             model_path = os.path.join(tmpdir, "model.pth")
             torch.save(model.state_dict(), model_path)
 

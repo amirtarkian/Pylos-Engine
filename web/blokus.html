@@ -34,13 +34,44 @@
     .sidebar h3 { font-size: 14px; font-weight: 500; color: #aaa; margin-bottom: 8px; }
 
     .status-bar {
-      padding: 12px 16px; border-radius: 8px;
-      background: rgba(255,255,255,0.05); text-align: center;
-      font-size: 16px; font-weight: 600;
+      padding: 16px 20px; border-radius: 10px;
+      text-align: center; font-size: 18px; font-weight: 700;
+      transition: all 0.3s ease;
     }
-    .status-bar.orange-turn { border-left: 3px solid #e67e22; }
-    .status-bar.purple-turn { border-left: 3px solid #9b59b6; }
-    .status-bar.game-over { border-left: 3px solid #2ecc71; }
+    .status-bar.orange-turn {
+      background: rgba(230, 126, 34, 0.15);
+      border: 2px solid rgba(230, 126, 34, 0.5);
+      color: #e67e22;
+      box-shadow: 0 0 20px rgba(230, 126, 34, 0.1);
+    }
+    .status-bar.purple-turn {
+      background: rgba(155, 89, 182, 0.15);
+      border: 2px solid rgba(155, 89, 182, 0.5);
+      color: #9b59b6;
+      box-shadow: 0 0 20px rgba(155, 89, 182, 0.1);
+    }
+    .status-bar.game-over {
+      background: rgba(46, 204, 113, 0.15);
+      border: 2px solid rgba(46, 204, 113, 0.5);
+      color: #2ecc71;
+      box-shadow: 0 0 20px rgba(46, 204, 113, 0.1);
+    }
+    .status-bar.waiting {
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      color: #888;
+    }
+    .turn-dot {
+      display: inline-block; width: 12px; height: 12px;
+      border-radius: 50%; margin-right: 8px;
+      vertical-align: middle; animation: pulse 1.5s ease-in-out infinite;
+    }
+    .turn-dot.orange { background: #e67e22; }
+    .turn-dot.purple { background: #9b59b6; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
 
     /* Controls */
     .controls { display: flex; flex-direction: column; gap: 8px; }
@@ -279,10 +310,10 @@ function handleMessage(msg) {
     gameActive = false;
     const winner = msg.winner;
     if (winner === 'draw') {
-      statusBar.textContent = "Game Over — Draw!";
+      statusBar.innerHTML = "&#127944; Game Over — Draw!";
     } else {
       const name = winner === 'white' ? 'Orange' : 'Purple';
-      statusBar.textContent = `Game Over — ${name} wins!`;
+      statusBar.innerHTML = `&#127942; Game Over — ${name} wins!`;
     }
     statusBar.className = 'status-bar game-over';
     pieceSection.style.display = 'none';
@@ -297,16 +328,17 @@ function updateStatus() {
   if (gameOver) return;
   const mode = selMode.value;
   const turnName = currentTurn === 'orange' ? 'Orange' : 'Purple';
+  const dotHtml = `<span class="turn-dot ${currentTurn}"></span>`;
 
   if (mode === 'human_vs_ai') {
     const humanTurn = currentTurn === (selColor.value === 'white' ? 'orange' : 'purple');
-    statusBar.textContent = humanTurn ? `Your turn (${turnName})` : `AI thinking...`;
+    statusBar.innerHTML = humanTurn ? `${dotHtml}Your turn (${turnName})` : `${dotHtml}AI thinking...`;
     isMyTurn = humanTurn;
   } else if (mode === 'ai_vs_ai') {
-    statusBar.textContent = `${turnName}'s turn (AI)`;
+    statusBar.innerHTML = `${dotHtml}${turnName}'s turn (AI)`;
     isMyTurn = false;
   } else {
-    statusBar.textContent = `${turnName}'s turn`;
+    statusBar.innerHTML = `${dotHtml}${turnName}'s turn`;
     isMyTurn = true;
   }
   statusBar.className = `status-bar ${currentTurn}-turn`;

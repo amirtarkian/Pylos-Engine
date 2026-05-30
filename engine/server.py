@@ -1,5 +1,5 @@
 """
-FastAPI WebSocket server for the Pylos board game engine.
+FastAPI WebSocket server for board game engines.
 
 Provides:
   - GET /checkpoints        — returns checkpoint manifest
@@ -16,6 +16,8 @@ import asyncio
 
 # Ensure engine modules are importable with plain imports
 sys.path.insert(0, os.path.dirname(__file__))
+# Ensure top-level packages (games.*) are importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
 import torch
@@ -25,10 +27,25 @@ from fastapi.staticfiles import StaticFiles
 
 from collections import defaultdict
 
-from game import PylosGame
-from models import PylosNetwork
+from models import GameNetwork
 from agents import AlphaZeroAgent
 from mcts import play as mcts_play
+
+# ---------------------------------------------------------------------------
+# Dynamic game loading
+# ---------------------------------------------------------------------------
+
+def _load_game_class(game_name):
+    """Dynamically load a game class from games/{game_name}/."""
+    import importlib
+    mod = importlib.import_module(f"games.{game_name}")
+    return mod.GAME_CLASS
+
+
+# Module-level game class — set from --game CLI arg or default
+_game_name = "pylos"
+game_cls = _load_game_class(_game_name)
+
 
 # ---------------------------------------------------------------------------
 # Game loop limits
@@ -37,15 +54,6 @@ from mcts import play as mcts_play
 MAX_MOVES = 200            # declare draw after this many moves
 REPETITION_LIMIT = 5       # declare draw if same board state occurs this many times
 
-
-def _board_hash(game: PylosGame) -> str:
-    """Return a hashable string representing the current board + turn."""
-    parts = []
-    for level in range(4):
-        parts.append(game.board[level].tobytes())
-    parts.append(bytes([game.turn + 1]))  # 0 for black, 2 for white
-    return b"".join(parts)
-
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -53,20 +61,47 @@ def _board_hash(game: PylosGame) -> str:
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(ENGINE_DIR)
 WEB_DIR = os.path.join(PROJECT_DIR, "web")
-CHECKPOINTS_DIR = os.path.join(ENGINE_DIR, "checkpoints")
-CHECKPOINTS_V2_DIR = os.path.join(ENGINE_DIR, "checkpoints_v2")
-CHECKPOINTS_V3_DIR = os.path.join(ENGINE_DIR, "checkpoints_v3")
-CHECKPOINTS_V4_DIR = os.path.join(ENGINE_DIR, "checkpoints_v4")
-CHECKPOINTS_V5_DIR = os.path.join(ENGINE_DIR, "checkpoints_v5")
-CHECKPOINTS_V6_DIR = os.path.join(ENGINE_DIR, "checkpoints_v6")
 
-# All training runs: (label, directory)
-# Note: V1/V2/V3 excluded — old MLP architecture incompatible with current PylosNetwork
-TRAINING_RUNS = [
-    ("v4", CHECKPOINTS_V4_DIR),
-    ("v5", CHECKPOINTS_V5_DIR),
-    ("v6", CHECKPOINTS_V6_DIR),
-]
+# Module-level: current game name, set from CLI
+_game_name = "pylos"
+
+
+def _find_checkpoint_dirs(game_name):
+    """Scan for checkpoint directories under engine/ and games/{game_name}/."""
+    dirs = []
+    # Look in engine/ for legacy checkpoints
+    if os.path.isdir(ENGINE_DIR):
+        for name in os.listdir(ENGINE_DIR):
+            if name.startswith('checkpoints'):
+                path = os.path.join(ENGINE_DIR, name)
+                if os.path.isdir(path):
+                    dirs.append(path)
+    # Look in games/{game_name}/ for new checkpoints
+    game_dir = os.path.join(PROJECT_DIR, 'games', game_name)
+    if os.path.isdir(game_dir):
+        for name in os.listdir(game_dir):
+            if name.startswith('checkpoints'):
+                path = os.path.join(game_dir, name)
+                if os.path.isdir(path):
+                    dirs.append(path)
+    return dirs
+
+
+def _build_training_runs(game_name):
+    """Build the list of (label, directory) training runs from checkpoint dirs."""
+    runs = []
+    for ckpt_dir in sorted(_find_checkpoint_dirs(game_name)):
+        dirname = os.path.basename(ckpt_dir)
+        # Extract version label: "checkpoints" -> "v1", "checkpoints_v2" -> "v2", etc.
+        if dirname == "checkpoints":
+            label = "v1"
+        elif dirname.startswith("checkpoints_"):
+            label = dirname.split("_", 1)[1]
+        else:
+            label = dirname
+        runs.append((label, ckpt_dir))
+    return runs
+
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -86,9 +121,10 @@ if os.path.isdir(os.path.join(WEB_DIR, "src")):
 @app.get("/checkpoints")
 async def get_checkpoints():
     """Return merged checkpoint manifests from all training runs."""
+    training_runs = _build_training_runs(_game_name)
     all_checkpoints = []
 
-    for label, ckpt_dir in TRAINING_RUNS:
+    for label, ckpt_dir in training_runs:
         manifest_path = os.path.join(ckpt_dir, "manifest.json")
         if os.path.isfile(manifest_path):
             with open(manifest_path, "r") as f:
@@ -113,9 +149,10 @@ _speed_samples = {}  # run_label -> deque of (step, timestamp), last 5 samples
 @app.get("/training/status")
 async def get_training_status():
     """Return training progress for all runs, with rolling average speed."""
+    training_runs = _build_training_runs(_game_name)
     runs = {}
 
-    for label, ckpt_dir in TRAINING_RUNS:
+    for label, ckpt_dir in training_runs:
         path = os.path.join(ckpt_dir, "training_progress.json")
         if os.path.isfile(path):
             with open(path, "r") as f:
@@ -155,9 +192,10 @@ async def get_training_status():
 @app.get("/training/loss-history")
 async def get_loss_history():
     """Return persistent loss history for all training runs, downsampled for charts."""
+    training_runs = _build_training_runs(_game_name)
     max_points = 500  # enough for chart resolution
     result = {}
-    for label, ckpt_dir in TRAINING_RUNS:
+    for label, ckpt_dir in training_runs:
         history_path = os.path.join(ckpt_dir, "loss_history.jsonl")
         entries = []
         if os.path.isfile(history_path):
@@ -202,16 +240,18 @@ async def training_dashboard():
 # ---------------------------------------------------------------------------
 
 def load_ai_agent(checkpoint_file: str) -> AlphaZeroAgent:
-    """Load a PylosNetwork from a checkpoint file and return an AlphaZeroAgent.
+    """Load a GameNetwork from a checkpoint file and return an AlphaZeroAgent.
 
     Reads model architecture from checkpoint metadata (V5+).
     Falls back to default architecture for older checkpoints.
     """
+    checkpoints_base = os.path.join(ENGINE_DIR, "checkpoints")
+
     if "/" in checkpoint_file:
         # v2+ path like "checkpoints_v2/checkpoint_00500.pth"
         checkpoint_path = os.path.join(ENGINE_DIR, checkpoint_file)
     else:
-        checkpoint_path = os.path.join(CHECKPOINTS_DIR, checkpoint_file)
+        checkpoint_path = os.path.join(checkpoints_base, checkpoint_file)
 
     checkpoint_data = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
 
@@ -230,8 +270,8 @@ def load_ai_agent(checkpoint_file: str) -> AlphaZeroAgent:
     policy_hidden = model_cfg.get("policy_hidden", 128)
     rich_obs = model_cfg.get("rich_obs", False)
 
-    game_tmp = PylosGame(rich_obs=rich_obs)
-    model = PylosNetwork(
+    game_tmp = game_cls(rich_obs=rich_obs)
+    model = GameNetwork(
         input_shape=game_tmp.observation_shape,
         action_space=game_tmp.action_space,
         hidden=hidden,
@@ -247,187 +287,12 @@ def load_ai_agent(checkpoint_file: str) -> AlphaZeroAgent:
 
 
 # ---------------------------------------------------------------------------
-# Helper: serialization
-# ---------------------------------------------------------------------------
-
-def board_to_json(game: PylosGame) -> list:
-    """Serialize the board as a list of 4 lists (one per level).
-
-    Each level contains dicts for occupied cells:
-        {"row": r, "col": c, "player": "white" | "black"}
-    """
-    player_names = {1: "white", -1: "black"}
-    levels = []
-    for level_idx in range(4):
-        size = game.board[level_idx].shape[0]
-        cells = []
-        for r in range(size):
-            for c in range(size):
-                val = int(game.board[level_idx][r, c])
-                if val != 0:
-                    cells.append({
-                        "row": r,
-                        "col": c,
-                        "player": player_names[val],
-                    })
-        levels.append(cells)
-    return levels
-
-
-def legal_moves_to_json(game: PylosGame) -> list:
-    """Serialize legal moves as a JSON-friendly list.
-
-    Placement moves:
-        {"type": "place", "level": L, "row": R, "col": C, "action": idx}
-    Raise moves:
-        {"type": "raise", "src": {"level": L, "row": R, "col": C},
-         "dst": {"level": L, "row": R, "col": C}, "action": idx}
-    """
-    legal_actions = game.get_legal_actions()
-    moves = []
-    for action in legal_actions:
-        if action < 30:
-            level, r, c = game.index_to_coords[action]
-            moves.append({
-                "type": "place",
-                "level": level,
-                "row": r,
-                "col": c,
-                "action": action,
-            })
-        else:
-            src_idx, dst_idx = game.raise_action_to_pair[action]
-            sl, sr, sc = game.index_to_coords[src_idx]
-            dl, dr, dc = game.index_to_coords[dst_idx]
-            moves.append({
-                "type": "raise",
-                "src": {"level": sl, "row": sr, "col": sc},
-                "dst": {"level": dl, "row": dr, "col": dc},
-                "action": action,
-            })
-    return moves
-
-
-def make_state_msg(game: PylosGame) -> dict:
-    """Build the full state message to send to the client."""
-    turn_names = {1: "white", -1: "black"}
-    return {
-        "type": "state",
-        "board": board_to_json(game),
-        "turn": turn_names[game.turn],
-        "reserves": {
-            "white": int(game.reserves[1]),
-            "black": int(game.reserves[-1]),
-        },
-        "legal_moves": legal_moves_to_json(game),
-    }
-
-
-def make_removal_msg(game: PylosGame) -> dict:
-    """Build the removal phase message to send to the client."""
-    player_names = {1: "white", -1: "black"}
-    return {
-        "type": "removal_phase",
-        "board": board_to_json(game),
-        "removable": [
-            {"level": l, "row": r, "col": c}
-            for l, r, c in game.get_pending_removable()
-        ],
-        "formation": [
-            {"level": l, "row": r, "col": c}
-            for l, r, c in game.get_formation_positions()
-        ],
-        "removed_so_far": game.removal_count,
-        "max_removals": 2,
-        "player": player_names[game.removal_player],
-        "reserves": {
-            "white": int(game.reserves[1]),
-            "black": int(game.reserves[-1]),
-        },
-    }
-
-
-def _action_to_json(game: PylosGame, action: int) -> dict:
-    """Convert an action index to a JSON-friendly dict."""
-    if action < 30:
-        level, r, c = game.index_to_coords[action]
-        return {"type": "place", "level": level, "row": r, "col": c}
-    else:
-        src_idx, dst_idx = game.raise_action_to_pair[action]
-        sl, sr, sc = game.index_to_coords[src_idx]
-        dl, dr, dc = game.index_to_coords[dst_idx]
-        return {
-            "type": "raise",
-            "src": {"level": sl, "row": sr, "col": sc},
-            "dst": {"level": dl, "row": dr, "col": dc},
-        }
-
-
-# ---------------------------------------------------------------------------
-# Helper: resolve client move to action index
-# ---------------------------------------------------------------------------
-
-def _resolve_action(game: PylosGame, action_msg: dict) -> int | None:
-    """Resolve a client action message to an internal action index.
-
-    Returns the action index if valid and legal, or None otherwise.
-    """
-    # If the client sends the action index directly, use it
-    if "action" in action_msg:
-        action = action_msg["action"]
-        if action in game.get_legal_actions():
-            return action
-        return None
-
-    move_type = action_msg.get("type")
-
-    if move_type == "place":
-        level = action_msg["level"]
-        row = action_msg["row"]
-        col = action_msg["col"]
-        coords = (level, row, col)
-        if coords in game.coords_to_index:
-            action = game.coords_to_index[coords]
-            if action in game.get_legal_actions():
-                return action
-        return None
-
-    elif move_type == "raise":
-        src = action_msg["src"]
-        dst = action_msg["dst"]
-        # src/dst can be [level, row, col] arrays or dicts
-        if isinstance(src, list):
-            src_coords = tuple(src)
-        else:
-            src_coords = (src["level"], src["row"], src["col"])
-        if isinstance(dst, list):
-            dst_coords = tuple(dst)
-        else:
-            dst_coords = (dst["level"], dst["row"], dst["col"])
-
-        if src_coords not in game.coords_to_index or dst_coords not in game.coords_to_index:
-            return None
-        src_idx = game.coords_to_index[src_coords]
-        dst_idx = game.coords_to_index[dst_coords]
-
-        # Find matching raise action
-        for action_idx, pair in game.raise_action_to_pair.items():
-            if pair == (src_idx, dst_idx):
-                if action_idx in game.get_legal_actions():
-                    return action_idx
-                return None
-        return None
-
-    return None
-
-
-# ---------------------------------------------------------------------------
 # Helper: AI turn
 # ---------------------------------------------------------------------------
 
 async def _do_ai_turn(
     ws: WebSocket,
-    game: PylosGame,
+    game,
     agent: AlphaZeroAgent,
     search_iters: int,
 ) -> bool:
@@ -452,19 +317,22 @@ async def _do_ai_turn(
         })
         return True
 
-    action_json = _action_to_json(game, action)
+    action_json = game.action_to_json(action)
 
     # Step WITHOUT auto-removal so we can capture the formation positions
     # before any pieces are removed (removal could break the pattern visually).
+    # Games without removal support simply ignore the kwarg.
     game.step(action, auto_remove=False)
 
     # Capture formation positions and perform greedy removal manually
+    # (only for games that support a removal phase, e.g. Pylos)
     formation_json = []
     removed_json = []
-    if game.pending_removal:
+    if hasattr(game, 'pending_removal') and game.pending_removal:
         # Capture the completed pattern (square/line) for orange highlight
-        for fl, fr, fc in game.get_formation_positions():
-            formation_json.append({"level": fl, "row": fr, "col": fc})
+        if hasattr(game, 'get_formation_positions'):
+            for fl, fr, fc in game.get_formation_positions():
+                formation_json.append({"level": fl, "row": fr, "col": fc})
 
         # Greedy AI removal: remove up to 2 pieces (lowest level first)
         for _ in range(2):
@@ -493,13 +361,16 @@ async def _do_ai_turn(
     await ws.send_json(ai_move_msg)
 
     # Always send the board state so the final piece animates
-    await ws.send_json(make_state_msg(game))
+    await ws.send_json(game.make_state_msg())
 
     # Check game over
     result = game.get_result()
     if result is not None:
         winner = "white" if result == 1 else "black"
-        reason = "apex_placed" if game.top_filled() else "no_legal_moves"
+        if hasattr(game, 'top_filled') and game.top_filled():
+            reason = "apex_placed"
+        else:
+            reason = "game_over"
         await ws.send_json({
             "type": "game_over",
             "winner": winner,
@@ -518,7 +389,7 @@ async def _do_ai_turn(
 async def game_ws(ws: WebSocket):
     await ws.accept()
 
-    game: PylosGame | None = None
+    game = None
     agent: AlphaZeroAgent | None = None
     agent_white: AlphaZeroAgent | None = None
     agent_black: AlphaZeroAgent | None = None
@@ -532,7 +403,7 @@ async def game_ws(ws: WebSocket):
     shared_delay = [1500]  # mutable container so AI loop sees updates
 
     # Per-session action history for take-back. Each entry is either an int
-    # (action index applied via PylosGame.step) or one of the sentinel strings
+    # (action index applied via game.step) or one of the sentinel strings
     # "remove:L,R,C" / "skip_removal".
     action_stack: list = []
 
@@ -550,7 +421,7 @@ async def game_ws(ws: WebSocket):
                     ai_vs_ai_task.cancel()
                     ai_vs_ai_task = None
 
-                game = PylosGame()
+                game = game_cls()
                 action_stack = []
                 mode = raw.get("mode", "human_vs_human")
                 agent = None
@@ -585,7 +456,7 @@ async def game_ws(ws: WebSocket):
                     shared_delay[0] = raw.get("delay_ms", 1500)
 
                 # Send initial state
-                await ws.send_json(make_state_msg(game))
+                await ws.send_json(game.make_state_msg())
 
                 # If human_vs_ai and AI goes first
                 if mode == "human_vs_ai" and agent is not None and game.turn != human_color:
@@ -621,7 +492,7 @@ async def game_ws(ws: WebSocket):
                                     break
 
                                 move_count += 1
-                                bh = _board_hash(_game)
+                                bh = _game.board_hash()
                                 state_counts[bh] += 1
 
                                 # Draw by repetition
@@ -655,12 +526,12 @@ async def game_ws(ws: WebSocket):
                     continue
 
                 # Block moves while removal phase is active
-                if game.pending_removal:
-                    await ws.send_json(make_removal_msg(game))
+                if hasattr(game, 'pending_removal') and game.pending_removal:
+                    await ws.send_json(game.make_removal_msg())
                     continue
 
                 action_msg = raw.get("action", {})
-                action = _resolve_action(game, action_msg)
+                action = game.action_from_json(action_msg)
 
                 if action is None:
                     await ws.send_json({"type": "error", "message": "Illegal move"})
@@ -671,18 +542,21 @@ async def game_ws(ws: WebSocket):
 
                 # Check for interactive removal phase BEFORE game-over,
                 # since removing pieces may free up moves for the opponent
-                if game.pending_removal:
-                    await ws.send_json(make_removal_msg(game))
+                if hasattr(game, 'pending_removal') and game.pending_removal:
+                    await ws.send_json(game.make_removal_msg())
                     continue
 
                 # Always send state so the final piece animates
-                await ws.send_json(make_state_msg(game))
+                await ws.send_json(game.make_state_msg())
 
                 # Check game over
                 result = game.get_result()
                 if result is not None:
                     winner = "white" if result == 1 else "black"
-                    reason = "apex_placed" if game.top_filled() else "no_legal_moves"
+                    if hasattr(game, 'top_filled') and game.top_filled():
+                        reason = "apex_placed"
+                    else:
+                        reason = "game_over"
                     await ws.send_json({
                         "type": "game_over",
                         "winner": winner,
@@ -698,7 +572,7 @@ async def game_ws(ws: WebSocket):
             # remove (during removal phase)
             # ----------------------------------------------------------
             elif msg_type == "remove":
-                if game is None or not game.pending_removal:
+                if game is None or not getattr(game, 'pending_removal', False):
                     await ws.send_json({"type": "error", "message": "Not in removal phase"})
                     continue
 
@@ -713,16 +587,19 @@ async def game_ws(ws: WebSocket):
 
                 # Still in removal phase?
                 if game.pending_removal:
-                    await ws.send_json(make_removal_msg(game))
+                    await ws.send_json(game.make_removal_msg())
                     continue
 
                 # Removal phase ended — send state, then check game over
-                await ws.send_json(make_state_msg(game))
+                await ws.send_json(game.make_state_msg())
 
                 result = game.get_result()
                 if result is not None:
                     winner = "white" if result == 1 else "black"
-                    reason = "apex_placed" if game.top_filled() else "no_legal_moves"
+                    if hasattr(game, 'top_filled') and game.top_filled():
+                        reason = "apex_placed"
+                    else:
+                        reason = "game_over"
                     await ws.send_json({
                         "type": "game_over",
                         "winner": winner,
@@ -738,20 +615,23 @@ async def game_ws(ws: WebSocket):
             # skip_removal (end removal phase early)
             # ----------------------------------------------------------
             elif msg_type == "skip_removal":
-                if game is None or not game.pending_removal:
+                if game is None or not getattr(game, 'pending_removal', False):
                     await ws.send_json({"type": "error", "message": "Not in removal phase"})
                     continue
 
                 game.skip_removal()
                 action_stack.append("skip_removal")
 
-                await ws.send_json(make_state_msg(game))
+                await ws.send_json(game.make_state_msg())
 
                 # Check game over after removal phase ends
                 result = game.get_result()
                 if result is not None:
                     winner = "white" if result == 1 else "black"
-                    reason = "apex_placed" if game.top_filled() else "no_legal_moves"
+                    if hasattr(game, 'top_filled') and game.top_filled():
+                        reason = "apex_placed"
+                    else:
+                        reason = "game_over"
                     await ws.send_json({
                         "type": "game_over",
                         "winner": winner,
@@ -800,7 +680,7 @@ async def game_ws(ws: WebSocket):
                     action_stack.pop()  # the placement/raise action int
 
                 # Replay remaining actions from a fresh game.
-                game = PylosGame()
+                game = game_cls()
                 for entry in action_stack:
                     if isinstance(entry, int):
                         game.step(entry, auto_remove=False)
@@ -813,7 +693,7 @@ async def game_ws(ws: WebSocket):
                     else:
                         raise ValueError(f"unknown action_stack entry: {entry!r}")
 
-                state = make_state_msg(game)
+                state = game.make_state_msg()
                 state["take_back"] = True
                 await ws.send_json(state)
 
@@ -832,5 +712,15 @@ async def game_ws(ws: WebSocket):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    parser = argparse.ArgumentParser(description="Board game WebSocket server")
+    parser.add_argument("--game", default="pylos", help="Game to load (e.g. pylos, blokus_duo)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on")
+    args = parser.parse_args()
+
+    _game_name = args.game
+    game_cls = _load_game_class(args.game)
+
+    uvicorn.run(app, host="0.0.0.0", port=args.port)

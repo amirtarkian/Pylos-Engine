@@ -1,13 +1,13 @@
 import torch
 from game import PylosGame
-from models import PylosNetwork
+from models import GameNetwork
 from agents import AlphaZeroAgentTrainer
 
 
 def test_training_smoke():
     """Run 2 self-play games to verify the full training loop works."""
     game = PylosGame()
-    model = PylosNetwork(game.observation_shape, game.action_space)
+    model = GameNetwork(game.observation_shape, game.action_space)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     agent = AlphaZeroAgentTrainer(model, optimizer, replay_buffer_max_size=64)
 
@@ -20,7 +20,7 @@ def test_training_smoke():
 def test_model_output_shapes():
     """Verify model produces correct output shapes."""
     game = PylosGame()
-    model = PylosNetwork(game.observation_shape, game.action_space)
+    model = GameNetwork(game.observation_shape, game.action_space)
     obs = torch.tensor(game.to_observation(), device=model.device)
 
     # Training mode (batch of 2 required for BatchNorm)

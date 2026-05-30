@@ -1,5 +1,5 @@
 """
-Training script for Pylos AlphaZero.
+Game-agnostic AlphaZero training script.
 
 Runs parallel self-play training with periodic checkpoint saving and evaluation.
 Uses multiprocessing to leverage multiple CPU cores for MCTS self-play.
@@ -17,6 +17,7 @@ import multiprocessing as mp
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import yaml
 import numpy as np
@@ -24,10 +25,15 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from game import PylosGame
-from models import PylosNetwork
+from models import GameNetwork
 from agents import AlphaZeroAgentTrainer
 from evaluate import evaluate_vs_model, RANDOM_ELO
+
+
+def _load_game_class(game_name):
+    import importlib
+    mod = importlib.import_module(f"games.{game_name}")
+    return mod.GAME_CLASS
 
 
 # ---------------------------------------------------------------------------
@@ -35,9 +41,10 @@ from evaluate import evaluate_vs_model, RANDOM_ELO
 # ---------------------------------------------------------------------------
 
 _worker_agent = None
+_worker_game_cls = None
 
 
-def _init_worker(model_state_dict, obs_shape, action_space, hidden=256, num_blocks=6,
+def _init_worker(game_name, model_state_dict, obs_shape, action_space, hidden=256, num_blocks=6,
                  value_hidden=64, policy_hidden=128, rich_obs=False):
     """Initialize a worker process with its own model copy on CPU.
 
@@ -45,14 +52,15 @@ def _init_worker(model_state_dict, obs_shape, action_space, hidden=256, num_bloc
     due to GPU dispatch overhead.  MPS is only used in the main process
     for batched training.
     """
-    global _worker_agent
+    global _worker_agent, _worker_game_cls
+    _worker_game_cls = _load_game_class(game_name)
     # Limit PyTorch threads per worker to avoid oversubscription
     torch.set_num_threads(1)
 
-    model = PylosNetwork(obs_shape, action_space, hidden=hidden,
-                         num_blocks=num_blocks, value_hidden=value_hidden,
-                         policy_hidden=policy_hidden)
-    # Force CPU for workers regardless of what PylosNetwork auto-detects
+    model = GameNetwork(obs_shape, action_space, hidden=hidden,
+                        num_blocks=num_blocks, value_hidden=value_hidden,
+                        policy_hidden=policy_hidden)
+    # Force CPU for workers regardless of what GameNetwork auto-detects
     model.device = torch.device("cpu")
     model.to(model.device)
     model.load_state_dict(model_state_dict)
@@ -62,16 +70,7 @@ def _init_worker(model_state_dict, obs_shape, action_space, hidden=256, num_bloc
     _worker_agent = AlphaZeroAgent(model, rich_obs=rich_obs)
 
 
-def _board_hash(game):
-    """Fast board state hash for repetition detection during self-play."""
-    parts = []
-    for level in range(4):
-        parts.append(game.board[level].tobytes())
-    parts.append(bytes([game.turn + 1]))
-    return b"".join(parts)
-
-
-def _batched_selfplay(model, batch_size, search_iters, c_puct, dir_alpha,
+def _batched_selfplay(game_cls, model, batch_size, search_iters, c_puct, dir_alpha,
                       max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold=15,
                       rich_obs=False):
     """Run a batch of self-play games with batched MCTS on GPU/MPS.
@@ -85,7 +84,7 @@ def _batched_selfplay(model, batch_size, search_iters, c_puct, dir_alpha,
     from mcts import batched_search
     from collections import defaultdict
 
-    games = [PylosGame(rich_obs=rich_obs) for _ in range(batch_size)]
+    games = [game_cls(rich_obs=rich_obs) for _ in range(batch_size)]
     buffers = [[] for _ in range(batch_size)]
     move_counts = [0] * batch_size
     state_counts = [defaultdict(int) if rep_limit else None for _ in range(batch_size)]
@@ -134,7 +133,7 @@ def _batched_selfplay(model, batch_size, search_iters, c_puct, dir_alpha,
                 continue
 
             if state_counts[i] is not None:
-                bh = _board_hash(game)
+                bh = game.board_hash()
                 state_counts[i][bh] += 1
                 if state_counts[i][bh] >= rep_limit:
                     results[i] = rep_penalty
@@ -168,7 +167,7 @@ def _run_selfplay(args):
     from mcts import search
     from collections import defaultdict
 
-    game = PylosGame(rich_obs=rich_obs)
+    game = _worker_game_cls(rich_obs=rich_obs)
     buffer = []
     move_count = 0
     state_counts = defaultdict(int) if rep_limit else None
@@ -200,7 +199,7 @@ def _run_selfplay(args):
 
         # Check repetition
         if state_counts is not None:
-            bh = _board_hash(game)
+            bh = game.board_hash()
             state_counts[bh] += 1
             if state_counts[bh] >= rep_limit:
                 draw_reason = "repetition"
@@ -486,8 +485,10 @@ def append_loss_history(ckpt_dir, step, value_loss, policy_loss):
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Train Pylos AlphaZero")
+    parser = argparse.ArgumentParser(description="Train AlphaZero")
     parser.add_argument("--config", type=str, default=None, help="Path to config YAML")
+    parser.add_argument("--game", type=str, default="pylos",
+                        help="Game module name under games/ (default: pylos)")
     parser.add_argument("--workers", type=int, default=None,
                         help="Number of parallel self-play workers (default: cpu_count - 2)")
     args = parser.parse_args()
@@ -508,10 +509,11 @@ def main():
         )
 
     # Create game, model, optimizer, agent
+    game_cls = _load_game_class(args.game)
     model_cfg = config.get("model", {})
     rich_obs = model_cfg.get("rich_obs", False)
-    game = PylosGame(rich_obs=rich_obs)
-    model = PylosNetwork(
+    game = game_cls(rich_obs=rich_obs)
+    model = GameNetwork(
         game.observation_shape, game.action_space,
         hidden=model_cfg.get("hidden", 256),
         num_blocks=model_cfg.get("num_blocks", 6),
@@ -650,7 +652,7 @@ def main():
                 remaining = min(selfplay_batch, num_games - games_done)
 
                 batch_results = _batched_selfplay(
-                    model, remaining, search_iters, c_puct, dir_alpha,
+                    game_cls, model, remaining, search_iters, c_puct, dir_alpha,
                     max_moves, rep_limit, ml_penalty, rep_penalty, temp_threshold,
                     rich_obs=rich_obs,
                 )
@@ -691,7 +693,7 @@ def main():
             return mp.Pool(
                 num_workers,
                 initializer=_init_worker,
-                initargs=(cpu_state, game.observation_shape, game.action_space,
+                initargs=(args.game, cpu_state, game.observation_shape, game.action_space,
                           model_cfg.get("hidden", 256), model_cfg.get("num_blocks", 6),
                           model_cfg.get("value_hidden", 64), model_cfg.get("policy_hidden", 128),
                           rich_obs),

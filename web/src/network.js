@@ -74,6 +74,13 @@ function _scheduleReconnect() {
 }
 
 /**
+ * Request a hint from the server (runs MCTS on current position).
+ */
+export function sendHint() {
+  send({ type: "hint" });
+}
+
+/**
  * Send a JSON message over the WebSocket.
  * @param {object} msg - message object (will be JSON-stringified)
  */

@@ -9,6 +9,9 @@
  *   clearHighlights()                 -- remove all sphere highlights
  *   flashFormation(positions, durationMs) -- flash orange glow on formation spheres
  *   flashAndRemove(positions, holdMs, fadeMs) -- flash green then shrink/fade (AI removal)
+ *   showHints(moves)                 -- render heatmap hint overlay from MCTS data
+ *   clearHints()                     -- remove hint overlay
+ *   isHintActive()                   -- check if hints are currently displayed
  */
 
 import * as THREE from "three";
@@ -26,6 +29,12 @@ let flashingMeshes = [];    // { mesh, entry, startTime, phase, duration }
 let formationFlashing = []; // { entry, startTime, durationMs }
 let onPositionClick = null;
 let onSphereClick = null;
+let onHintHover = null;
+
+// Hint overlay state
+let hintMeshes = [];        // { mesh, level, row, col, moveData }
+let hintArrowGroup = null;  // THREE.Group for raise arrow
+let hintActive = false;
 
 // Shared geometries & materials (created once)
 let sphereGeoWhite, sphereGeoBlack;
@@ -208,9 +217,10 @@ export function init(container) {
 
 // ── Callbacks ────────────────────────────────────────────────────
 
-export function setCallbacks(posClickCb, sphereClickCb) {
+export function setCallbacks(posClickCb, sphereClickCb, hintHoverCb) {
   onPositionClick = posClickCb;
   onSphereClick = sphereClickCb;
+  onHintHover = hintHoverCb || null;
 }
 
 // ── Board sync ───────────────────────────────────────────────────
@@ -480,6 +490,7 @@ function _getIntersects(event) {
   raycaster.setFromCamera(mouse, camera);
 
   const targets = [
+    ...hintMeshes.map((hm) => hm.mesh),
     ...positionMarkers.map((pm) => pm.mesh),
     ...sphereMeshes.map((sm) => sm.mesh),
   ];
@@ -490,12 +501,25 @@ function onPointerMove(event) {
   const intersects = _getIntersects(event);
   if (intersects.length > 0) {
     const ud = intersects[0].object.userData;
+    if (ud.type === "hint") {
+      renderer.domElement.style.cursor = "pointer";
+      if (onHintHover) {
+        const screenPos = intersects[0].point.clone().project(camera);
+        const rect = renderer.domElement.getBoundingClientRect();
+        const x = ((screenPos.x + 1) / 2) * rect.width + rect.left;
+        const y = ((-screenPos.y + 1) / 2) * rect.height + rect.top;
+        onHintHover(ud.moveData, x, y);
+      }
+      return;
+    }
     if (ud.type === "position" || ud.type === "sphere") {
       renderer.domElement.style.cursor = "pointer";
+      if (onHintHover) onHintHover(null, 0, 0);
       return;
     }
   }
   renderer.domElement.style.cursor = "default";
+  if (onHintHover) onHintHover(null, 0, 0);
 }
 
 // Track drag distance so camera drags don't trigger piece placement.
@@ -595,8 +619,151 @@ function _animate() {
     }
   }
 
+  _animateHints(now);
   controls.update();
   renderer.render(scene, camera);
+}
+
+// ── Hint heatmap rendering ───────────────────────────────────────
+
+const HINT_COLORS = [
+  { t: 0.0, color: 0x1a3a5c, emissive: 0.3, opacity: 0.15 },
+  { t: 0.33, color: 0x2a8a7a, emissive: 0.5, opacity: 0.35 },
+  { t: 0.66, color: 0xe8943d, emissive: 0.7, opacity: 0.65 },
+  { t: 1.0, color: 0xff6b35, emissive: 0.9, opacity: 0.85 },
+];
+
+function _lerpHintColor(score) {
+  const stops = HINT_COLORS;
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (score >= stops[i].t && score <= stops[i + 1].t) {
+      lo = stops[i];
+      hi = stops[i + 1];
+      break;
+    }
+  }
+  const f = hi.t === lo.t ? 1 : (score - lo.t) / (hi.t - lo.t);
+  const c = new THREE.Color(lo.color).lerp(new THREE.Color(hi.color), f);
+  return {
+    color: c,
+    emissive: lo.emissive + (hi.emissive - lo.emissive) * f,
+    opacity: lo.opacity + (hi.opacity - lo.opacity) * f,
+  };
+}
+
+export function showHints(moves) {
+  clearHints();
+  if (!moves || moves.length === 0) return;
+  hintActive = true;
+
+  // Hide legal move markers
+  for (const pm of positionMarkers) {
+    pm.mesh.material.opacity = 0;
+    pm.mesh.material.emissive = new THREE.Color(0x000000);
+    pm.mesh.material.emissiveIntensity = 0;
+  }
+
+  const maxScore = moves[0].score;
+  const hintGeo = new THREE.SphereGeometry(SPHERE_RADIUS * 0.85, 32, 32);
+
+  for (const move of moves) {
+    if (move.type === "place") {
+      const normalized = maxScore > 0 ? move.score / maxScore : 0;
+      const style = _lerpHintColor(normalized);
+      const mat = new THREE.MeshStandardMaterial({
+        color: style.color,
+        emissive: style.color,
+        emissiveIntensity: style.emissive,
+        transparent: true,
+        opacity: style.opacity,
+        roughness: 0.3,
+      });
+      const mesh = new THREE.Mesh(hintGeo, mat);
+      const pos = boardToWorld(move.level, move.row, move.col);
+      mesh.position.set(pos.x, pos.y, pos.z);
+      mesh.userData = { type: "hint", moveData: move };
+      scene.add(mesh);
+      hintMeshes.push({
+        mesh, level: move.level, row: move.row, col: move.col,
+        moveData: move, isTop: move === moves[0],
+      });
+    }
+  }
+
+  // Raise arrow: if the top-ranked move is a raise, draw a tube arrow
+  if (moves[0].type === "raise") {
+    const src = moves[0].src;
+    const dst = moves[0].dst;
+    const srcPos = boardToWorld(src.level, src.row, src.col);
+    const dstPos = boardToWorld(dst.level, dst.row, dst.col);
+    const start = new THREE.Vector3(srcPos.x, srcPos.y, srcPos.z);
+    const end = new THREE.Vector3(dstPos.x, dstPos.y, dstPos.z);
+
+    const group = new THREE.Group();
+    const dir = end.clone().sub(start);
+    const len = dir.length();
+    const mid = start.clone().add(end).divideScalar(2);
+    mid.y += 0.5;
+
+    const curve = new THREE.CatmullRomCurve3([start, mid, end]);
+    const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.04, 8, false);
+    const tubeMat = new THREE.MeshStandardMaterial({
+      color: 0xe8943d,
+      emissive: new THREE.Color(0xe8943d),
+      emissiveIntensity: 0.7,
+      transparent: true,
+      opacity: 0.8,
+    });
+    group.add(new THREE.Mesh(tubeGeo, tubeMat));
+
+    const coneGeo = new THREE.ConeGeometry(0.08, 0.15, 8);
+    const coneMat = tubeMat.clone();
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.position.copy(end);
+    const tangent = curve.getTangent(1);
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+    group.add(cone);
+
+    scene.add(group);
+    hintArrowGroup = group;
+  }
+}
+
+export function clearHints() {
+  for (const hm of hintMeshes) {
+    scene.remove(hm.mesh);
+    hm.mesh.material.dispose();
+  }
+  hintMeshes = [];
+  if (hintArrowGroup) {
+    hintArrowGroup.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry.dispose();
+        child.material.dispose();
+      }
+    });
+    scene.remove(hintArrowGroup);
+    hintArrowGroup = null;
+  }
+  hintActive = false;
+}
+
+export function isHintActive() {
+  return hintActive;
+}
+
+// Animate hint pulse in render loop
+function _animateHints(now) {
+  for (const hm of hintMeshes) {
+    if (hm.isTop) {
+      const t = (now / 1000) * 4.2;
+      const pulse = 0.5 + 0.4 * Math.sin(t);
+      hm.mesh.material.emissiveIntensity = pulse;
+      const scale = 0.85 * (1.0 + 0.15 * (0.5 + 0.5 * Math.sin(t)));
+      hm.mesh.scale.setScalar(scale);
+    }
+  }
 }
 
 export function setCameraBindings(bindings) {

@@ -25,11 +25,8 @@ from games.blokus_duo.pieces import PIECES, PIECE_NAMES, NUM_PIECES
 
 BOARD_SIZE = 14
 
-# Starting positions for each player (diagonal corners)
-START_POS = {
-    1: (4, 4),    # Player 1 start
-    -1: (9, 9),   # Player 2 start
-}
+# Starting positions (either player can use either dot)
+START_POSITIONS = [(4, 4), (9, 9)]
 
 
 def _build_action_table():
@@ -117,11 +114,11 @@ class BlokusDuoGame(Game):
         is_first_move = self.move_count[player] == 0
 
         if is_first_move:
-            # First piece must cover the starting position
-            start = START_POS[player]
-            if start not in cells:
-                return False
-            return True
+            # First piece must cover any unoccupied starting position
+            for start in START_POSITIONS:
+                if start in cells and self.board[start[0], start[1]] == 0:
+                    return True
+            return False
 
         # Check no edge-to-edge contact with same color
         has_corner_contact = False

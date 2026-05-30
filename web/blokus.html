@@ -9,113 +9,122 @@
     html, body {
       width: 100%; height: 100%;
       font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #1a1a2e; color: #e0e0e0;
+      background: #0f0f1a; color: #e0e0e0;
     }
 
     .app { display: flex; height: 100vh; }
 
-    /* Board area */
     .board-area {
       flex: 1; display: flex; flex-direction: column;
       align-items: center; justify-content: center; padding: 20px;
+      background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 70%);
     }
 
-    #board-canvas { cursor: pointer; border-radius: 8px; }
+    #board-canvas {
+      cursor: pointer;
+      border-radius: 12px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(100,100,200,0.05);
+    }
 
-    /* Sidebar */
     .sidebar {
-      width: 320px; background: rgba(20, 20, 45, 0.85);
-      border-left: 1px solid rgba(255,255,255,0.08);
-      padding: 20px; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 16px;
+      width: 340px;
+      background: linear-gradient(180deg, rgba(20,20,45,0.95) 0%, rgba(15,15,30,0.98) 100%);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      padding: 24px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 18px;
     }
 
-    .sidebar h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-    .sidebar h3 { font-size: 14px; font-weight: 500; color: #aaa; margin-bottom: 8px; }
+    .sidebar h2 {
+      font-size: 20px; font-weight: 700; letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #e67e22, #9b59b6);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .sidebar h3 { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
 
     .status-bar {
-      padding: 16px 20px; border-radius: 10px;
+      padding: 16px 20px; border-radius: 12px;
       text-align: center; font-size: 18px; font-weight: 700;
-      transition: all 0.3s ease;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .status-bar.orange-turn {
-      background: rgba(230, 126, 34, 0.15);
-      border: 2px solid rgba(230, 126, 34, 0.5);
+      background: linear-gradient(135deg, rgba(230,126,34,0.12) 0%, rgba(230,126,34,0.06) 100%);
+      border: 1.5px solid rgba(230,126,34,0.4);
       color: #e67e22;
-      box-shadow: 0 0 20px rgba(230, 126, 34, 0.1);
+      box-shadow: 0 0 24px rgba(230,126,34,0.08), inset 0 1px 0 rgba(255,255,255,0.05);
     }
     .status-bar.purple-turn {
-      background: rgba(155, 89, 182, 0.15);
-      border: 2px solid rgba(155, 89, 182, 0.5);
+      background: linear-gradient(135deg, rgba(155,89,182,0.12) 0%, rgba(155,89,182,0.06) 100%);
+      border: 1.5px solid rgba(155,89,182,0.4);
       color: #9b59b6;
-      box-shadow: 0 0 20px rgba(155, 89, 182, 0.1);
+      box-shadow: 0 0 24px rgba(155,89,182,0.08), inset 0 1px 0 rgba(255,255,255,0.05);
     }
     .status-bar.game-over {
-      background: rgba(46, 204, 113, 0.15);
-      border: 2px solid rgba(46, 204, 113, 0.5);
+      background: linear-gradient(135deg, rgba(46,204,113,0.15) 0%, rgba(46,204,113,0.05) 100%);
+      border: 1.5px solid rgba(46,204,113,0.5);
       color: #2ecc71;
-      box-shadow: 0 0 20px rgba(46, 204, 113, 0.1);
+      box-shadow: 0 0 30px rgba(46,204,113,0.1);
+      font-size: 20px;
     }
     .status-bar.waiting {
-      background: rgba(255,255,255,0.05);
-      border: 2px solid rgba(255,255,255,0.1);
-      color: #888;
+      background: rgba(255,255,255,0.03); border: 1.5px solid rgba(255,255,255,0.08); color: #666;
     }
     .turn-dot {
-      display: inline-block; width: 12px; height: 12px;
+      display: inline-block; width: 10px; height: 10px;
       border-radius: 50%; margin-right: 8px;
-      vertical-align: middle; animation: pulse 1.5s ease-in-out infinite;
+      vertical-align: middle; animation: pulse 2s ease-in-out infinite;
     }
-    .turn-dot.orange { background: #e67e22; }
-    .turn-dot.purple { background: #9b59b6; }
+    .turn-dot.orange { background: #e67e22; box-shadow: 0 0 8px rgba(230,126,34,0.5); }
+    .turn-dot.purple { background: #9b59b6; box-shadow: 0 0 8px rgba(155,89,182,0.5); }
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
+      50% { opacity: 0.4; transform: scale(0.8); }
     }
 
-    /* Controls */
-    .controls { display: flex; flex-direction: column; gap: 8px; }
-    .control-row { display: flex; gap: 8px; align-items: center; }
-    .control-row label { font-size: 13px; color: #aaa; min-width: 80px; }
     select, button {
-      font-family: inherit; font-size: 13px; padding: 6px 12px;
-      background: rgba(255,255,255,0.08); color: #e0e0e0;
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 6px;
-      cursor: pointer;
+      font-family: inherit; font-size: 13px; padding: 8px 14px;
+      background: rgba(255,255,255,0.06); color: #ccc;
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+      cursor: pointer; transition: all 0.2s;
     }
-    select:hover, button:hover { background: rgba(255,255,255,0.14); }
+    select:hover, button:hover { background: rgba(255,255,255,0.1); color: #fff; }
     button.primary {
-      background: rgba(46, 204, 113, 0.2); border-color: rgba(46, 204, 113, 0.4);
+      background: linear-gradient(135deg, rgba(46,204,113,0.2), rgba(46,204,113,0.1));
+      border-color: rgba(46,204,113,0.3); color: #2ecc71; font-weight: 600;
     }
-    button.primary:hover { background: rgba(46, 204, 113, 0.35); }
+    button.primary:hover { background: linear-gradient(135deg, rgba(46,204,113,0.35), rgba(46,204,113,0.2)); }
 
-    /* Piece tray */
-    .piece-tray {
-      display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0;
+    .controls { display: flex; flex-direction: column; gap: 10px; }
+    .control-row { display: flex; gap: 8px; align-items: center; }
+    .control-row label { font-size: 12px; color: #777; min-width: 80px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .scores { display: flex; gap: 12px; }
+    .score-card {
+      flex: 1; padding: 14px; border-radius: 10px;
+      background: rgba(255,255,255,0.03); text-align: center;
+      border: 1px solid rgba(255,255,255,0.05);
     }
+    .score-card .label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1.5px; }
+    .score-card .value { font-size: 28px; font-weight: 800; margin-top: 4px; }
+    .score-card.orange .value { color: #e67e22; }
+    .score-card.purple .value { color: #9b59b6; }
+
+    .piece-tray { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
     .piece-btn {
-      width: 48px; height: 48px; position: relative;
-      background: rgba(255,255,255,0.06); border: 2px solid transparent;
-      border-radius: 6px; cursor: pointer; padding: 2px;
+      width: 50px; height: 50px; position: relative;
+      background: rgba(255,255,255,0.04); border: 2px solid transparent;
+      border-radius: 8px; cursor: pointer; padding: 3px;
+      transition: all 0.15s;
     }
-    .piece-btn:hover { background: rgba(255,255,255,0.12); }
-    .piece-btn.selected { border-color: #2ecc71; background: rgba(46, 204, 113, 0.15); }
-    .piece-btn.used { opacity: 0.2; pointer-events: none; }
+    .piece-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+    .piece-btn.selected {
+      border-color: #2ecc71; background: rgba(46,204,113,0.12);
+      box-shadow: 0 0 12px rgba(46,204,113,0.15);
+    }
+    .piece-btn.used { opacity: 0.15; pointer-events: none; filter: grayscale(1); }
     .piece-btn canvas { width: 100%; height: 100%; }
 
     .rotate-controls { display: flex; gap: 8px; margin: 4px 0; }
-    .rotate-controls button { flex: 1; }
-
-    /* Scores */
-    .scores { display: flex; gap: 12px; }
-    .score-card {
-      flex: 1; padding: 10px; border-radius: 8px;
-      background: rgba(255,255,255,0.05); text-align: center;
-    }
-    .score-card .label { font-size: 11px; color: #aaa; text-transform: uppercase; }
-    .score-card .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
-    .score-card.orange .value { color: #e67e22; }
-    .score-card.purple .value { color: #9b59b6; }
+    .rotate-controls button { flex: 1; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -125,9 +134,7 @@
     </div>
     <div class="sidebar">
       <h2>Blokus Duo</h2>
-
-      <div class="status-bar" id="status-bar">Click New Game to start</div>
-
+      <div class="status-bar waiting" id="status-bar">Click New Game to start</div>
       <div class="scores">
         <div class="score-card orange">
           <div class="label">Orange</div>
@@ -138,7 +145,6 @@
           <div class="value" id="purple-pieces">21</div>
         </div>
       </div>
-
       <div class="controls">
         <div class="control-row">
           <label>Mode</label>
@@ -166,9 +172,8 @@
         </div>
         <button class="primary" id="btn-new-game">New Game</button>
       </div>
-
       <div id="piece-section" style="display:none;">
-        <h3>Your Pieces <span id="orient-label"></span></h3>
+        <h3>Pieces <span id="orient-label" style="color:#2ecc71;"></span></h3>
         <div class="rotate-controls">
           <button id="btn-rotate">Rotate (R)</button>
           <button id="btn-flip">Flip (F)</button>
@@ -179,53 +184,47 @@
   </div>
 
 <script>
-// ── Constants ──────────────────────────────────────────────────────
 const BOARD_SIZE = 14;
-const CELL_SIZE = 38;
-const BOARD_PAD = 30;
+const CELL_SIZE = 40;
+const BOARD_PAD = 32;
+const GAP = 2;
 const CANVAS_SIZE = BOARD_SIZE * CELL_SIZE + BOARD_PAD * 2;
 
-const COLORS = {
-  bg: '#16213e',
-  grid: '#2a2a5a',
-  gridLine: '#3a3a6a',
+const C = {
+  boardBg: '#1e1e3a',
+  cell: '#252550',
+  cellStroke: '#2f2f5f',
   orange: '#e67e22',
-  orangeLight: 'rgba(230, 126, 34, 0.3)',
+  orangeHi: '#f0a050',
+  orangeShadow: '#b35e10',
   purple: '#9b59b6',
-  purpleLight: 'rgba(155, 89, 182, 0.3)',
-  legal: 'rgba(46, 204, 113, 0.25)',
-  legalStroke: 'rgba(46, 204, 113, 0.6)',
-  hover: 'rgba(46, 204, 113, 0.4)',
-  invalid: 'rgba(231, 76, 60, 0.4)',
-  startPos: 'rgba(255, 255, 255, 0.08)',
+  purpleHi: '#c080d8',
+  purpleShadow: '#6a3580',
+  hoverValid: 'rgba(46, 204, 113, 0.35)',
+  hoverInvalid: 'rgba(231, 76, 60, 0.3)',
+  startDot: 'rgba(255,255,255,0.12)',
+  coord: '#555',
 };
 
-// ── State ──────────────────────────────────────────────────────────
-let board = null;          // 14x14 array of null | "orange" | "purple"
-let legalMoves = [];       // from server
+let board = null;
+let legalMoves = [];
 let currentTurn = null;
 let gameOver = false;
-let myColor = null;        // in HvAI mode
 let isMyTurn = false;
 let gameActive = false;
-
-// Piece selection
 let selectedPieceIdx = null;
 let selectedOrientIdx = 0;
-let hoveredCell = null;    // {row, col} under mouse
-let piecesData = null;     // from PIECES module (fetched via legal moves)
+let hoveredCell = null;
+let knownPieceOrients = {};
+let lastPlacedCells = [];
+let animProgress = 1;
+let animTimer = null;
 
-// All pieces info (built from first legal_moves response)
-let allPieces = [];        // [{name, orientations, used}]
-let pieceOrientations = {};
-
-// ── Canvas setup ───────────────────────────────────────────────────
 const canvas = document.getElementById('board-canvas');
 const ctx = canvas.getContext('2d');
 canvas.width = CANVAS_SIZE;
 canvas.height = CANVAS_SIZE;
 
-// ── DOM refs ───────────────────────────────────────────────────────
 const statusBar = document.getElementById('status-bar');
 const orangePiecesEl = document.getElementById('orange-pieces');
 const purplePiecesEl = document.getElementById('purple-pieces');
@@ -241,377 +240,350 @@ const orientLabel = document.getElementById('orient-label');
 const groupColor = document.getElementById('group-color');
 const groupSearchIters = document.getElementById('group-search-iters');
 
-// ── WebSocket ──────────────────────────────────────────────────────
 let ws = null;
-
 function wsConnect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const url = `${proto}//${location.host}/game`;
-  console.log('[ws] connecting to', url);
-  ws = new WebSocket(url);
+  ws = new WebSocket(`${proto}//${location.host}/game`);
   ws.onopen = () => console.log('[ws] connected');
-  ws.onmessage = (e) => {
-    try {
-      const data = JSON.parse(e.data);
-      console.log('[ws] received:', data.type, data);
-      handleMessage(data);
-    } catch (err) {
-      console.error('[ws] parse error:', err);
-    }
-  };
-  ws.onerror = (e) => console.error('[ws] error:', e);
-  ws.onclose = () => { console.log('[ws] closed, reconnecting...'); setTimeout(wsConnect, 2000); };
+  ws.onmessage = (e) => { try { handleMessage(JSON.parse(e.data)); } catch(err) { console.error(err); } };
+  ws.onclose = () => setTimeout(wsConnect, 2000);
 }
+function wsSend(msg) { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 
-function wsSend(msg) {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
-}
-
-let knownPieceOrients = {}; // piece_idx -> {orient_idx -> cells}
-
-function extractPieceInfo(legalMoves) {
-  for (const move of legalMoves) {
-    const pi = move.piece_idx;
-    const oi = move.orientation;
-    if (!knownPieceOrients[pi]) knownPieceOrients[pi] = {};
-    if (!knownPieceOrients[pi][oi]) {
-      // Normalize cells relative to placement position
-      const cells = move.cells.map(c => ({row: c.row - move.row, col: c.col - move.col}));
-      knownPieceOrients[pi][oi] = cells;
+function extractPieceInfo(moves) {
+  for (const m of moves) {
+    if (!knownPieceOrients[m.piece_idx]) knownPieceOrients[m.piece_idx] = {};
+    if (!knownPieceOrients[m.piece_idx][m.orientation]) {
+      knownPieceOrients[m.piece_idx][m.orientation] = m.cells.map(c => ({row: c.row - m.row, col: c.col - m.col}));
     }
   }
 }
 
-// ── Message handling ───────────────────────────────────────────────
 function handleMessage(msg) {
   if (msg.type === 'state') {
+    const oldBoard = board;
     board = msg.board;
     currentTurn = msg.turn;
     legalMoves = msg.legal_moves || [];
     gameOver = false;
     gameActive = true;
-
     if (legalMoves.length > 0) extractPieceInfo(legalMoves);
+    orangePiecesEl.textContent = msg.pieces_remaining?.orange ?? '?';
+    purplePiecesEl.textContent = msg.pieces_remaining?.purple ?? '?';
 
-    const pr = msg.pieces_remaining || {};
-    orangePiecesEl.textContent = pr.orange ?? '?';
-    purplePiecesEl.textContent = pr.purple ?? '?';
+    // Find newly placed cells for animation
+    if (oldBoard) {
+      lastPlacedCells = [];
+      for (let r = 0; r < BOARD_SIZE; r++)
+        for (let c = 0; c < BOARD_SIZE; c++)
+          if (board[r][c] && !oldBoard[r]?.[c]) lastPlacedCells.push({r, c});
+      if (lastPlacedCells.length > 0) startPlaceAnim();
+    }
 
     updateStatus();
     updatePieceTray();
     drawBoard();
-
   } else if (msg.type === 'ai_move') {
-    // AI made a move; state will follow
-    statusBar.textContent = `AI played ${msg.action?.piece || 'a piece'} (${msg.thinking_time_ms}ms)`;
-
+    statusBar.innerHTML = `<span class="turn-dot ${currentTurn}"></span>AI played ${msg.action?.piece || '?'} (${msg.thinking_time_ms}ms)`;
   } else if (msg.type === 'game_over') {
-    gameOver = true;
-    gameActive = false;
-    const winner = msg.winner;
-    if (winner === 'draw') {
-      statusBar.innerHTML = "&#127944; Game Over — Draw!";
-    } else {
-      const name = winner === 'white' ? 'Orange' : 'Purple';
-      statusBar.innerHTML = `&#127942; Game Over — ${name} wins!`;
-    }
+    gameOver = true; gameActive = false;
+    const w = msg.winner;
+    const name = w === 'draw' ? 'Draw' : (w === 'white' ? 'Orange' : 'Purple');
+    statusBar.innerHTML = w === 'draw' ? 'Game Over — Draw!' : `Game Over — ${name} wins!`;
     statusBar.className = 'status-bar game-over';
     pieceSection.style.display = 'none';
     drawBoard();
-
   } else if (msg.type === 'error') {
     statusBar.textContent = `Error: ${msg.message}`;
   }
+}
+
+function startPlaceAnim() {
+  animProgress = 0;
+  if (animTimer) cancelAnimationFrame(animTimer);
+  const start = performance.now();
+  function tick(now) {
+    animProgress = Math.min(1, (now - start) / 300);
+    drawBoard();
+    if (animProgress < 1) animTimer = requestAnimationFrame(tick);
+    else animTimer = null;
+  }
+  animTimer = requestAnimationFrame(tick);
 }
 
 function updateStatus() {
   if (gameOver) return;
   const mode = selMode.value;
   const turnName = currentTurn === 'orange' ? 'Orange' : 'Purple';
-  const dotHtml = `<span class="turn-dot ${currentTurn}"></span>`;
-
+  const dot = `<span class="turn-dot ${currentTurn}"></span>`;
   if (mode === 'human_vs_ai') {
-    const humanTurn = currentTurn === (selColor.value === 'white' ? 'orange' : 'purple');
-    statusBar.innerHTML = humanTurn ? `${dotHtml}Your turn (${turnName})` : `${dotHtml}AI thinking...`;
-    isMyTurn = humanTurn;
+    const ht = currentTurn === (selColor.value === 'white' ? 'orange' : 'purple');
+    statusBar.innerHTML = ht ? `${dot}Your turn (${turnName})` : `${dot}AI thinking...`;
+    isMyTurn = ht;
   } else if (mode === 'ai_vs_ai') {
-    statusBar.innerHTML = `${dotHtml}${turnName}'s turn (AI)`;
-    isMyTurn = false;
+    statusBar.innerHTML = `${dot}${turnName}'s turn (AI)`; isMyTurn = false;
   } else {
-    statusBar.innerHTML = `${dotHtml}${turnName}'s turn`;
-    isMyTurn = true;
+    statusBar.innerHTML = `${dot}${turnName}'s turn`; isMyTurn = true;
   }
   statusBar.className = `status-bar ${currentTurn}-turn`;
-
-  // Show/hide piece section
-  if (isMyTurn && legalMoves.length > 0) {
-    pieceSection.style.display = 'block';
-  } else {
-    pieceSection.style.display = 'none';
-  }
+  pieceSection.style.display = (isMyTurn && legalMoves.length > 0) ? 'block' : 'none';
 }
 
-// ── Piece tray ─────────────────────────────────────────────────────
 function updatePieceTray() {
   pieceTray.innerHTML = '';
-  if (!isMyTurn || legalMoves.length === 0) return;
-
-  // Get available piece indices from legal moves
-  const availablePieces = new Set(legalMoves.map(m => m.piece_idx));
-  const allPieceIndices = new Set(legalMoves.map(m => m.piece_idx));
-
-  // Build buttons for pieces 0-20
+  if (!isMyTurn || !legalMoves.length) return;
+  const avail = new Set(legalMoves.map(m => m.piece_idx));
   for (let pi = 0; pi < 21; pi++) {
     const btn = document.createElement('div');
-    btn.className = 'piece-btn';
-    if (!availablePieces.has(pi)) btn.classList.add('used');
-    if (pi === selectedPieceIdx) btn.classList.add('selected');
-
-    // Draw mini preview
-    const miniCanvas = document.createElement('canvas');
-    miniCanvas.width = 44; miniCanvas.height = 44;
-    const mctx = miniCanvas.getContext('2d');
-    drawMiniPiece(mctx, pi, 44);
-    btn.appendChild(miniCanvas);
-
-    btn.addEventListener('click', () => {
-      if (!availablePieces.has(pi)) return;
-      selectedPieceIdx = pi;
-      selectedOrientIdx = 0;
-      updatePieceTray();
-      drawBoard();
-    });
-
+    btn.className = 'piece-btn' + (!avail.has(pi) ? ' used' : '') + (pi === selectedPieceIdx ? ' selected' : '');
+    const mc = document.createElement('canvas');
+    mc.width = 44; mc.height = 44;
+    drawMiniPiece(mc.getContext('2d'), pi, 44);
+    btn.appendChild(mc);
+    btn.onclick = () => { if (!avail.has(pi)) return; selectedPieceIdx = pi; selectedOrientIdx = 0; updatePieceTray(); drawBoard(); };
     pieceTray.appendChild(btn);
   }
-
-  // Update orient label
   if (selectedPieceIdx !== null && knownPieceOrients[selectedPieceIdx]) {
-    const numOrients = Object.keys(knownPieceOrients[selectedPieceIdx]).length;
-    orientLabel.textContent = `(${selectedOrientIdx + 1}/${numOrients})`;
-  } else {
-    orientLabel.textContent = '';
-  }
+    const n = Object.keys(knownPieceOrients[selectedPieceIdx]).length;
+    orientLabel.textContent = `(${selectedOrientIdx + 1}/${n})`;
+  } else orientLabel.textContent = '';
 }
 
-function drawMiniPiece(ctx, pieceIdx, size) {
-  const orients = knownPieceOrients[pieceIdx];
-  if (!orients) return;
-  const cells = orients[Object.keys(orients)[0]]; // first orientation
-  if (!cells) return;
-
-  const maxR = Math.max(...cells.map(c => c.row)) + 1;
-  const maxC = Math.max(...cells.map(c => c.col)) + 1;
-  const cellSz = Math.min(size / Math.max(maxR, maxC, 3), 10);
-  const offX = (size - maxC * cellSz) / 2;
-  const offY = (size - maxR * cellSz) / 2;
-
-  const color = currentTurn === 'orange' ? COLORS.orange : COLORS.purple;
-  for (const cell of cells) {
-    ctx.fillStyle = color;
-    ctx.fillRect(offX + cell.col * cellSz, offY + cell.row * cellSz, cellSz - 1, cellSz - 1);
+function drawMiniPiece(mctx, pi, sz) {
+  const o = knownPieceOrients[pi]; if (!o) return;
+  const cells = o[Object.keys(o)[0]]; if (!cells) return;
+  const maxR = Math.max(...cells.map(c=>c.row))+1, maxC = Math.max(...cells.map(c=>c.col))+1;
+  const cs = Math.min(sz / Math.max(maxR, maxC, 3), 11);
+  const ox = (sz - maxC*cs)/2, oy = (sz - maxR*cs)/2;
+  const base = currentTurn === 'orange' ? C.orange : C.purple;
+  const hi = currentTurn === 'orange' ? C.orangeHi : C.purpleHi;
+  for (const c of cells) {
+    const x = ox + c.col*cs, y = oy + c.row*cs, s = cs - 1;
+    mctx.fillStyle = base;
+    mctx.fillRect(x, y, s, s);
+    mctx.fillStyle = hi;
+    mctx.fillRect(x, y, s, 2);
+    mctx.fillRect(x, y, 2, s);
   }
 }
 
 // ── Board drawing ──────────────────────────────────────────────────
 function drawBoard() {
-  ctx.fillStyle = COLORS.bg;
+  // Background with subtle vignette
+  ctx.fillStyle = C.boardBg;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  const vg = ctx.createRadialGradient(CANVAS_SIZE/2, CANVAS_SIZE/2, CANVAS_SIZE*0.3, CANVAS_SIZE/2, CANVAS_SIZE/2, CANVAS_SIZE*0.7);
+  vg.addColorStop(0, 'rgba(255,255,255,0.02)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.15)');
+  ctx.fillStyle = vg;
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // Always draw the grid (even before a game starts)
+  const isNewCell = new Set(lastPlacedCells.map(c => `${c.r},${c.c}`));
+
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
-      const x = BOARD_PAD + c * CELL_SIZE;
-      const y = BOARD_PAD + r * CELL_SIZE;
+      const x = BOARD_PAD + c * CELL_SIZE + GAP/2;
+      const y = BOARD_PAD + r * CELL_SIZE + GAP/2;
+      const s = CELL_SIZE - GAP;
 
-      // Cell background
-      ctx.fillStyle = COLORS.grid;
-      ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+      // Cell base
+      ctx.fillStyle = C.cell;
+      ctx.beginPath();
+      roundRect(ctx, x, y, s, s, 3);
+      ctx.fill();
 
-      // Grid line
-      ctx.strokeStyle = COLORS.gridLine;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
-
-      // Start positions
-      if ((r === 4 && c === 4) || (r === 9 && c === 9)) {
-        ctx.fillStyle = COLORS.startPos;
-        ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      // Start position markers
+      if ((r===4&&c===4)||(r===9&&c===9)) {
+        ctx.fillStyle = C.startDot;
         ctx.beginPath();
-        ctx.arc(x + CELL_SIZE/2, y + CELL_SIZE/2, 4, 0, Math.PI * 2);
+        roundRect(ctx, x+3, y+3, s-6, s-6, 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.beginPath();
+        ctx.arc(x+s/2, y+s/2, 4, 0, Math.PI*2);
         ctx.fill();
       }
 
-      // Placed pieces
-      const cell = board ? board[r]?.[c] : null;
-      if (cell) {
-        ctx.fillStyle = cell === 'orange' ? COLORS.orange : COLORS.purple;
-        ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
-        ctx.fillStyle = cell === 'orange' ? 'rgba(255,200,100,0.3)' : 'rgba(200,150,255,0.3)';
-        ctx.fillRect(x + 4, y + 4, CELL_SIZE - 12, 3);
+      // Placed pieces with 3D bevel effect
+      const val = board ? board[r]?.[c] : null;
+      if (val) {
+        const isOrange = val === 'orange';
+        const base = isOrange ? C.orange : C.purple;
+        const hi = isOrange ? C.orangeHi : C.purpleHi;
+        const shadow = isOrange ? C.orangeShadow : C.purpleShadow;
+
+        let scale = 1;
+        if (isNewCell.has(`${r},${c}`) && animProgress < 1) {
+          scale = 0.3 + 0.7 * easeOutBack(animProgress);
+        }
+
+        const cx = x + s/2, cy = y + s/2;
+        const ts = s * scale;
+        const tx = cx - ts/2, ty = cy - ts/2;
+
+        // Drop shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        roundRect(ctx, tx+2, ty+2, ts, ts, 4);
+        ctx.fill();
+
+        // Main tile
+        ctx.fillStyle = base;
+        ctx.beginPath();
+        roundRect(ctx, tx, ty, ts, ts, 4);
+        ctx.fill();
+
+        // Top highlight bevel
+        ctx.fillStyle = hi;
+        ctx.beginPath();
+        roundRect(ctx, tx, ty, ts, 4, 4);
+        ctx.fill();
+
+        // Left highlight bevel
+        ctx.fillStyle = hi + '80';
+        ctx.fillRect(tx, ty+4, 3, ts-8);
+
+        // Bottom shadow bevel
+        ctx.fillStyle = shadow;
+        ctx.beginPath();
+        roundRect(ctx, tx, ty+ts-4, ts, 4, 0);
+        ctx.fill();
+
+        // Inner shine
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.beginPath();
+        roundRect(ctx, tx+4, ty+4, ts-8, ts/2-4, 2);
+        ctx.fill();
       }
     }
   }
 
-  // Draw legal move highlights (corners where you can place)
-  if (isMyTurn && selectedPieceIdx === null && !gameOver) {
-    // Show all legal placement corners
-    const legalCells = new Set();
-    for (const m of legalMoves) {
-      for (const c of m.cells) legalCells.add(`${c.row},${c.col}`);
-    }
-    // Just show a subtle grid indicator — too many to highlight individually
-  }
-
-  // Draw hover preview
+  // Hover preview
   if (isMyTurn && selectedPieceIdx !== null && hoveredCell && !gameOver) {
     const cells = getSelectedPieceCells(hoveredCell.row, hoveredCell.col);
     if (cells) {
-      const isValid = findMatchingAction(selectedPieceIdx, selectedOrientIdx, hoveredCell.row, hoveredCell.col);
+      const valid = findMatchingAction(selectedPieceIdx, selectedOrientIdx, hoveredCell.row, hoveredCell.col) !== null;
       for (const cell of cells) {
-        const x = BOARD_PAD + cell.col * CELL_SIZE;
-        const y = BOARD_PAD + cell.row * CELL_SIZE;
         if (cell.row >= 0 && cell.row < BOARD_SIZE && cell.col >= 0 && cell.col < BOARD_SIZE) {
-          ctx.fillStyle = isValid !== null ? COLORS.hover : COLORS.invalid;
-          ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+          const x = BOARD_PAD + cell.col * CELL_SIZE + GAP/2;
+          const y = BOARD_PAD + cell.row * CELL_SIZE + GAP/2;
+          const s = CELL_SIZE - GAP;
+          ctx.fillStyle = valid ? C.hoverValid : C.hoverInvalid;
+          ctx.beginPath();
+          roundRect(ctx, x, y, s, s, 3);
+          ctx.fill();
+          if (valid) {
+            ctx.strokeStyle = 'rgba(46,204,113,0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            roundRect(ctx, x, y, s, s, 3);
+            ctx.stroke();
+          }
         }
       }
     }
   }
 
-  // Draw coordinates
-  ctx.fillStyle = '#666';
+  // Coordinates
+  ctx.fillStyle = C.coord;
   ctx.font = '11px system-ui';
   ctx.textAlign = 'center';
-  for (let c = 0; c < BOARD_SIZE; c++) {
-    ctx.fillText(c, BOARD_PAD + c * CELL_SIZE + CELL_SIZE/2, BOARD_PAD - 8);
-  }
+  for (let c = 0; c < BOARD_SIZE; c++)
+    ctx.fillText(c, BOARD_PAD + c*CELL_SIZE + CELL_SIZE/2, BOARD_PAD - 10);
   ctx.textAlign = 'right';
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    ctx.fillText(r, BOARD_PAD - 8, BOARD_PAD + r * CELL_SIZE + CELL_SIZE/2 + 4);
-  }
+  for (let r = 0; r < BOARD_SIZE; r++)
+    ctx.fillText(r, BOARD_PAD - 10, BOARD_PAD + r*CELL_SIZE + CELL_SIZE/2 + 4);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w/2, h/2);
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function easeOutBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
 function getSelectedPieceCells(row, col) {
   if (selectedPieceIdx === null) return null;
-  const orients = knownPieceOrients[selectedPieceIdx];
-  if (!orients) return null;
-  const keys = Object.keys(orients).map(Number).sort((a,b)=>a-b);
+  const o = knownPieceOrients[selectedPieceIdx]; if (!o) return null;
+  const keys = Object.keys(o).map(Number).sort((a,b)=>a-b);
   const oi = keys[selectedOrientIdx % keys.length];
-  const cells = orients[oi];
-  if (!cells) return null;
-  return cells.map(c => ({row: row + c.row, col: col + c.col}));
+  const cells = o[oi]; if (!cells) return null;
+  return cells.map(c => ({row: row+c.row, col: col+c.col}));
 }
 
-function findMatchingAction(pieceIdx, orientIdx, row, col) {
-  const keys = Object.keys(knownPieceOrients[pieceIdx] || {}).map(Number).sort((a,b)=>a-b);
-  const oi = keys[orientIdx % keys.length];
-  for (const m of legalMoves) {
-    if (m.piece_idx === pieceIdx && m.orientation === oi && m.row === row && m.col === col) {
-      return m.action;
-    }
-  }
+function findMatchingAction(pi, oi, row, col) {
+  const keys = Object.keys(knownPieceOrients[pi]||{}).map(Number).sort((a,b)=>a-b);
+  const orient = keys[oi % keys.length];
+  for (const m of legalMoves)
+    if (m.piece_idx === pi && m.orientation === orient && m.row === row && m.col === col) return m.action;
   return null;
 }
 
-// ── Mouse interaction ──────────────────────────────────────────────
+// ── Input ──────────────────────────────────────────────────────────
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX;
-  const my = (e.clientY - rect.top) * scaleY;
-
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
   const col = Math.floor((mx - BOARD_PAD) / CELL_SIZE);
   const row = Math.floor((my - BOARD_PAD) / CELL_SIZE);
-
-  if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-    hoveredCell = {row, col};
-  } else {
-    hoveredCell = null;
-  }
+  hoveredCell = (row>=0 && row<BOARD_SIZE && col>=0 && col<BOARD_SIZE) ? {row,col} : null;
   drawBoard();
 });
+canvas.addEventListener('mouseleave', () => { hoveredCell = null; drawBoard(); });
 
-canvas.addEventListener('mouseleave', () => {
-  hoveredCell = null;
-  drawBoard();
-});
-
-canvas.addEventListener('click', (e) => {
-  if (!isMyTurn || gameOver || !hoveredCell) return;
-  if (selectedPieceIdx === null) return;
-
+canvas.addEventListener('click', () => {
+  if (!isMyTurn || gameOver || !hoveredCell || selectedPieceIdx === null) return;
   const action = findMatchingAction(selectedPieceIdx, selectedOrientIdx, hoveredCell.row, hoveredCell.col);
   if (action !== null) {
-    wsSend({type: 'move', action: {action: action}});
-    selectedPieceIdx = null;
-    selectedOrientIdx = 0;
-    hoveredCell = null;
+    wsSend({type: 'move', action: {action}});
+    selectedPieceIdx = null; selectedOrientIdx = 0; hoveredCell = null;
   }
 });
 
-// ── Keyboard shortcuts ─────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'r' || e.key === 'R') {
-    rotateSelectedPiece();
-  } else if (e.key === 'f' || e.key === 'F') {
-    flipSelectedPiece();
-  }
+  if (e.key==='r'||e.key==='R') rotPiece();
+  else if (e.key==='f'||e.key==='F') flipPiece();
 });
 
-function rotateSelectedPiece() {
-  if (selectedPieceIdx === null) return;
-  const keys = Object.keys(knownPieceOrients[selectedPieceIdx] || {});
-  if (keys.length === 0) return;
-  selectedOrientIdx = (selectedOrientIdx + 1) % keys.length;
-  orientLabel.textContent = `(${selectedOrientIdx + 1}/${keys.length})`;
-  drawBoard();
+function rotPiece() {
+  if (selectedPieceIdx===null) return;
+  const k = Object.keys(knownPieceOrients[selectedPieceIdx]||{}); if (!k.length) return;
+  selectedOrientIdx = (selectedOrientIdx+1) % k.length;
+  orientLabel.textContent = `(${selectedOrientIdx+1}/${k.length})`; drawBoard();
+}
+function flipPiece() {
+  if (selectedPieceIdx===null) return;
+  const k = Object.keys(knownPieceOrients[selectedPieceIdx]||{}); if (k.length<=1) return;
+  selectedOrientIdx = (selectedOrientIdx + Math.floor(k.length/2)) % k.length;
+  orientLabel.textContent = `(${selectedOrientIdx+1}/${k.length})`; drawBoard();
 }
 
-function flipSelectedPiece() {
-  // Flip skips orientations — jump by half
-  if (selectedPieceIdx === null) return;
-  const keys = Object.keys(knownPieceOrients[selectedPieceIdx] || {});
-  if (keys.length <= 1) return;
-  const half = Math.floor(keys.length / 2);
-  selectedOrientIdx = (selectedOrientIdx + half) % keys.length;
-  orientLabel.textContent = `(${selectedOrientIdx + 1}/${keys.length})`;
-  drawBoard();
-}
+btnRotate.addEventListener('click', rotPiece);
+btnFlip.addEventListener('click', flipPiece);
 
-btnRotate.addEventListener('click', rotateSelectedPiece);
-btnFlip.addEventListener('click', flipSelectedPiece);
-
-// ── Controls ───────────────────────────────────────────────────────
 selMode.addEventListener('change', () => {
-  const mode = selMode.value;
-  groupColor.style.display = mode === 'human_vs_ai' ? 'flex' : 'none';
-  groupSearchIters.style.display = mode === 'human_vs_human' ? 'none' : 'flex';
+  groupColor.style.display = selMode.value === 'human_vs_ai' ? 'flex' : 'none';
+  groupSearchIters.style.display = selMode.value === 'human_vs_human' ? 'none' : 'flex';
 });
 selMode.dispatchEvent(new Event('change'));
 
 btnNewGame.addEventListener('click', () => {
   const mode = selMode.value;
-  const msg = {
-    type: 'new_game',
-    mode: mode,
-  };
-  if (mode === 'human_vs_ai') {
-    msg.human_color = selColor.value;
-    msg.search_iterations = parseInt(selSearchIters.value);
-  } else if (mode === 'ai_vs_ai') {
-    msg.search_iterations = parseInt(selSearchIters.value);
-    msg.delay_ms = 1000;
-  }
-  selectedPieceIdx = null;
-  selectedOrientIdx = 0;
-  knownPieceOrients = {};
+  const msg = {type: 'new_game', mode};
+  if (mode === 'human_vs_ai') { msg.human_color = selColor.value; msg.search_iterations = +selSearchIters.value; }
+  else if (mode === 'ai_vs_ai') { msg.search_iterations = +selSearchIters.value; msg.delay_ms = 1000; }
+  selectedPieceIdx = null; selectedOrientIdx = 0; knownPieceOrients = {}; lastPlacedCells = [];
   wsSend(msg);
 });
 
-// ── Init ───────────────────────────────────────────────────────────
 drawBoard();
 wsConnect();
 </script>

@@ -215,24 +215,26 @@ let ws = null;
 
 function wsConnect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${proto}//${location.host}/game`);
-  ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
-  ws.onclose = () => setTimeout(wsConnect, 2000);
+  const url = `${proto}//${location.host}/game`;
+  console.log('[ws] connecting to', url);
+  ws = new WebSocket(url);
+  ws.onopen = () => console.log('[ws] connected');
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      console.log('[ws] received:', data.type, data);
+      handleMessage(data);
+    } catch (err) {
+      console.error('[ws] parse error:', err);
+    }
+  };
+  ws.onerror = (e) => console.error('[ws] error:', e);
+  ws.onclose = () => { console.log('[ws] closed, reconnecting...'); setTimeout(wsConnect, 2000); };
 }
 
 function wsSend(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
-
-// ── Piece definitions (fetched from first state) ───────────────────
-// We'll build pieces from the legal moves data
-const PIECE_DEFS = [
-  {name:"I1", cells:[[[0,0]]]},
-  {name:"I2", cells:[[[0,0],[0,1]], [[0,0],[1,0]]]},
-  {name:"I3", cells:[[[0,0],[0,1],[0,2]], [[0,0],[1,0],[2,0]]]},
-  {name:"V3", cells:[[[0,0],[1,0],[1,1]], [[0,0],[0,1],[1,1]], [[0,0],[0,1],[1,0]], [[0,0],[1,0],[1,-1]].map(c=>[c[0],c[1]+1]? undefined:undefined)]},
-];
-// Actually, let's extract piece orientations from the server's legal_moves
 
 let knownPieceOrients = {}; // piece_idx -> {orient_idx -> cells}
 
@@ -384,9 +386,7 @@ function drawBoard() {
   ctx.fillStyle = COLORS.bg;
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  if (!board) return;
-
-  // Draw grid
+  // Always draw the grid (even before a game starts)
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
       const x = BOARD_PAD + c * CELL_SIZE;
@@ -412,7 +412,7 @@ function drawBoard() {
       }
 
       // Placed pieces
-      const cell = board[r]?.[c];
+      const cell = board ? board[r]?.[c] : null;
       if (cell) {
         ctx.fillStyle = cell === 'orange' ? COLORS.orange : COLORS.purple;
         ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);

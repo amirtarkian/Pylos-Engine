@@ -295,7 +295,7 @@ def _elo_label(elo):
         return "Expert"
 
 
-def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path, ckpt_dir):
+def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path, ckpt_dir, game_cls=None):
     """Background thread: evaluate checkpoint vs random subset of previous models."""
     try:
         with _manifest_lock:
@@ -338,6 +338,7 @@ def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path,
                     filepath, opp_path,
                     num_games=games_per_opponent,
                     search_iterations=EVAL_SEARCH_ITERS,
+                    game_cls=game_cls,
                 )
                 wins = wr * games_per_opponent
                 losses = (1.0 - wr) * games_per_opponent
@@ -371,7 +372,7 @@ def _run_eval_in_background(filepath, filename, step, eval_games, manifest_path,
         print(f"\n  [eval] Step {step} evaluation failed: {e}")
 
 
-def save_checkpoint(agent, step, config, manifest_path):
+def save_checkpoint(agent, step, config, manifest_path, game_cls=None):
     """Save a training checkpoint and kick off background evaluation."""
     ckpt_dir = config["checkpoints"]["dir"]
     os.makedirs(ckpt_dir, exist_ok=True)
@@ -426,7 +427,7 @@ def save_checkpoint(agent, step, config, manifest_path):
     eval_games = config["checkpoints"]["eval_games"]
     eval_thread = threading.Thread(
         target=_run_eval_in_background,
-        args=(filepath, filename, step, eval_games, manifest_path, ckpt_dir),
+        args=(filepath, filename, step, eval_games, manifest_path, ckpt_dir, game_cls),
         daemon=False,  # Changed: don't kill on exit
     )
     eval_thread.start()
@@ -682,7 +683,7 @@ def main():
                                latest_vloss, latest_ploss, start_time)
 
                 if games_done >= next_save and games_done < num_games:
-                    save_checkpoint(agent, games_done, config, manifest_path)
+                    save_checkpoint(agent, games_done, config, manifest_path, game_cls=game_cls)
                     next_save += save_every
         finally:
             pbar.close()
@@ -742,7 +743,7 @@ def main():
                         if games_since_train > 0:
                             _train_batch()
                             games_since_train = 0
-                        save_checkpoint(agent, games_done, config, manifest_path)
+                        save_checkpoint(agent, games_done, config, manifest_path, game_cls=game_cls)
                         pool.terminate()
                         pool.join()
                         pool = _create_pool()
@@ -767,7 +768,7 @@ def main():
 
     # Final checkpoint (if not already saved)
     if num_games % save_every != 0:
-        save_checkpoint(agent, num_games, config, manifest_path)
+        save_checkpoint(agent, num_games, config, manifest_path, game_cls=game_cls)
 
     write_progress(progress_path, num_games, num_games,
                    latest_vloss, latest_ploss, start_time, status="complete")

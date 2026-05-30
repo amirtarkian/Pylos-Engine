@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blokus Duo</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #1a1a2e; color: #e0e0e0;
+    }
+
+    .app { display: flex; height: 100vh; }
+
+    /* Board area */
+    .board-area {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+
+    #board-canvas { cursor: pointer; border-radius: 8px; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 320px; background: rgba(20, 20, 45, 0.85);
+      border-left: 1px solid rgba(255,255,255,0.08);
+      padding: 20px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    .sidebar h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .sidebar h3 { font-size: 14px; font-weight: 500; color: #aaa; margin-bottom: 8px; }
+
+    .status-bar {
+      padding: 12px 16px; border-radius: 8px;
+      background: rgba(255,255,255,0.05); text-align: center;
+      font-size: 16px; font-weight: 600;
+    }
+    .status-bar.orange-turn { border-left: 3px solid #e67e22; }
+    .status-bar.purple-turn { border-left: 3px solid #9b59b6; }
+    .status-bar.game-over { border-left: 3px solid #2ecc71; }
+
+    /* Controls */
+    .controls { display: flex; flex-direction: column; gap: 8px; }
+    .control-row { display: flex; gap: 8px; align-items: center; }
+    .control-row label { font-size: 13px; color: #aaa; min-width: 80px; }
+    select, button {
+      font-family: inherit; font-size: 13px; padding: 6px 12px;
+      background: rgba(255,255,255,0.08); color: #e0e0e0;
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 6px;
+      cursor: pointer;
+    }
+    select:hover, button:hover { background: rgba(255,255,255,0.14); }
+    button.primary {
+      background: rgba(46, 204, 113, 0.2); border-color: rgba(46, 204, 113, 0.4);
+    }
+    button.primary:hover { background: rgba(46, 204, 113, 0.35); }
+
+    /* Piece tray */
+    .piece-tray {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0;
+    }
+    .piece-btn {
+      width: 48px; height: 48px; position: relative;
+      background: rgba(255,255,255,0.06); border: 2px solid transparent;
+      border-radius: 6px; cursor: pointer; padding: 2px;
+    }
+    .piece-btn:hover { background: rgba(255,255,255,0.12); }
+    .piece-btn.selected { border-color: #2ecc71; background: rgba(46, 204, 113, 0.15); }
+    .piece-btn.used { opacity: 0.2; pointer-events: none; }
+    .piece-btn canvas { width: 100%; height: 100%; }
+
+    .rotate-controls { display: flex; gap: 8px; margin: 4px 0; }
+    .rotate-controls button { flex: 1; }
+
+    /* Scores */
+    .scores { display: flex; gap: 12px; }
+    .score-card {
+      flex: 1; padding: 10px; border-radius: 8px;
+      background: rgba(255,255,255,0.05); text-align: center;
+    }
+    .score-card .label { font-size: 11px; color: #aaa; text-transform: uppercase; }
+    .score-card .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .score-card.orange .value { color: #e67e22; }
+    .score-card.purple .value { color: #9b59b6; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="board-area">
+      <canvas id="board-canvas"></canvas>
+    </div>
+    <div class="sidebar">
+      <h2>Blokus Duo</h2>
+
+      <div class="status-bar" id="status-bar">Click New Game to start</div>
+
+      <div class="scores">
+        <div class="score-card orange">
+          <div class="label">Orange</div>
+          <div class="value" id="orange-pieces">21</div>
+        </div>
+        <div class="score-card purple">
+          <div class="label">Purple</div>
+          <div class="value" id="purple-pieces">21</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="control-row">
+          <label>Mode</label>
+          <select id="sel-mode">
+            <option value="human_vs_human">Human vs Human</option>
+            <option value="human_vs_ai">Human vs AI</option>
+            <option value="ai_vs_ai">AI vs AI</option>
+          </select>
+        </div>
+        <div class="control-row" id="group-color">
+          <label>Play as</label>
+          <select id="sel-color">
+            <option value="white">Orange (first)</option>
+            <option value="black">Purple (second)</option>
+          </select>
+        </div>
+        <div class="control-row" id="group-search-iters">
+          <label>AI Strength</label>
+          <select id="sel-search-iters">
+            <option value="16">16 iterations</option>
+            <option value="32" selected>32 iterations</option>
+            <option value="64">64 iterations</option>
+            <option value="128">128 iterations</option>
+          </select>
+        </div>
+        <button class="primary" id="btn-new-game">New Game</button>
+      </div>
+
+      <div id="piece-section" style="display:none;">
+        <h3>Your Pieces <span id="orient-label"></span></h3>
+        <div class="rotate-controls">
+          <button id="btn-rotate">Rotate (R)</button>
+          <button id="btn-flip">Flip (F)</button>
+        </div>
+        <div class="piece-tray" id="piece-tray"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────
+const BOARD_SIZE = 14;
+const CELL_SIZE = 38;
+const BOARD_PAD = 30;
+const CANVAS_SIZE = BOARD_SIZE * CELL_SIZE + BOARD_PAD * 2;
+
+const COLORS = {
+  bg: '#16213e',
+  grid: '#2a2a5a',
+  gridLine: '#3a3a6a',
+  orange: '#e67e22',
+  orangeLight: 'rgba(230, 126, 34, 0.3)',
+  purple: '#9b59b6',
+  purpleLight: 'rgba(155, 89, 182, 0.3)',
+  legal: 'rgba(46, 204, 113, 0.25)',
+  legalStroke: 'rgba(46, 204, 113, 0.6)',
+  hover: 'rgba(46, 204, 113, 0.4)',
+  invalid: 'rgba(231, 76, 60, 0.4)',
+  startPos: 'rgba(255, 255, 255, 0.08)',
+};
+
+// ── State ──────────────────────────────────────────────────────────
+let board = null;          // 14x14 array of null | "orange" | "purple"
+let legalMoves = [];       // from server
+let currentTurn = null;
+let gameOver = false;
+let myColor = null;        // in HvAI mode
+let isMyTurn = false;
+let gameActive = false;
+
+// Piece selection
+let selectedPieceIdx = null;
+let selectedOrientIdx = 0;
+let hoveredCell = null;    // {row, col} under mouse
+let piecesData = null;     // from PIECES module (fetched via legal moves)
+
+// All pieces info (built from first legal_moves response)
+let allPieces = [];        // [{name, orientations, used}]
+let pieceOrientations = {};
+
+// ── Canvas setup ───────────────────────────────────────────────────
+const canvas = document.getElementById('board-canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = CANVAS_SIZE;
+canvas.height = CANVAS_SIZE;
+
+// ── DOM refs ───────────────────────────────────────────────────────
+const statusBar = document.getElementById('status-bar');
+const orangePiecesEl = document.getElementById('orange-pieces');
+const purplePiecesEl = document.getElementById('purple-pieces');
+const selMode = document.getElementById('sel-mode');
+const selColor = document.getElementById('sel-color');
+const selSearchIters = document.getElementById('sel-search-iters');
+const btnNewGame = document.getElementById('btn-new-game');
+const pieceTray = document.getElementById('piece-tray');
+const pieceSection = document.getElementById('piece-section');
+const btnRotate = document.getElementById('btn-rotate');
+const btnFlip = document.getElementById('btn-flip');
+const orientLabel = document.getElementById('orient-label');
+const groupColor = document.getElementById('group-color');
+const groupSearchIters = document.getElementById('group-search-iters');
+
+// ── WebSocket ──────────────────────────────────────────────────────
+let ws = null;
+
+function wsConnect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/game`);
+  ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
+  ws.onclose = () => setTimeout(wsConnect, 2000);
+}
+
+function wsSend(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+
+// ── Piece definitions (fetched from first state) ───────────────────
+// We'll build pieces from the legal moves data
+const PIECE_DEFS = [
+  {name:"I1", cells:[[[0,0]]]},
+  {name:"I2", cells:[[[0,0],[0,1]], [[0,0],[1,0]]]},
+  {name:"I3", cells:[[[0,0],[0,1],[0,2]], [[0,0],[1,0],[2,0]]]},
+  {name:"V3", cells:[[[0,0],[1,0],[1,1]], [[0,0],[0,1],[1,1]], [[0,0],[0,1],[1,0]], [[0,0],[1,0],[1,-1]].map(c=>[c[0],c[1]+1]? undefined:undefined)]},
+];
+// Actually, let's extract piece orientations from the server's legal_moves
+
+let knownPieceOrients = {}; // piece_idx -> {orient_idx -> cells}
+
+function extractPieceInfo(legalMoves) {
+  for (const move of legalMoves) {
+    const pi = move.piece_idx;
+    const oi = move.orientation;
+    if (!knownPieceOrients[pi]) knownPieceOrients[pi] = {};
+    if (!knownPieceOrients[pi][oi]) {
+      // Normalize cells relative to placement position
+      const cells = move.cells.map(c => ({row: c.row - move.row, col: c.col - move.col}));
+      knownPieceOrients[pi][oi] = cells;
+    }
+  }
+}
+
+// ── Message handling ───────────────────────────────────────────────
+function handleMessage(msg) {
+  if (msg.type === 'state') {
+    board = msg.board;
+    currentTurn = msg.turn;
+    legalMoves = msg.legal_moves || [];
+    gameOver = false;
+    gameActive = true;
+
+    if (legalMoves.length > 0) extractPieceInfo(legalMoves);
+
+    const pr = msg.pieces_remaining || {};
+    orangePiecesEl.textContent = pr.orange ?? '?';
+    purplePiecesEl.textContent = pr.purple ?? '?';
+
+    updateStatus();
+    updatePieceTray();
+    drawBoard();
+
+  } else if (msg.type === 'ai_move') {
+    // AI made a move; state will follow
+    statusBar.textContent = `AI played ${msg.action?.piece || 'a piece'} (${msg.thinking_time_ms}ms)`;
+
+  } else if (msg.type === 'game_over') {
+    gameOver = true;
+    gameActive = false;
+    const winner = msg.winner;
+    if (winner === 'draw') {
+      statusBar.textContent = "Game Over — Draw!";
+    } else {
+      const name = winner === 'white' ? 'Orange' : 'Purple';
+      statusBar.textContent = `Game Over — ${name} wins!`;
+    }
+    statusBar.className = 'status-bar game-over';
+    pieceSection.style.display = 'none';
+    drawBoard();
+
+  } else if (msg.type === 'error') {
+    statusBar.textContent = `Error: ${msg.message}`;
+  }
+}
+
+function updateStatus() {
+  if (gameOver) return;
+  const mode = selMode.value;
+  const turnName = currentTurn === 'orange' ? 'Orange' : 'Purple';
+
+  if (mode === 'human_vs_ai') {
+    const humanTurn = currentTurn === (selColor.value === 'white' ? 'orange' : 'purple');
+    statusBar.textContent = humanTurn ? `Your turn (${turnName})` : `AI thinking...`;
+    isMyTurn = humanTurn;
+  } else if (mode === 'ai_vs_ai') {
+    statusBar.textContent = `${turnName}'s turn (AI)`;
+    isMyTurn = false;
+  } else {
+    statusBar.textContent = `${turnName}'s turn`;
+    isMyTurn = true;
+  }
+  statusBar.className = `status-bar ${currentTurn}-turn`;
+
+  // Show/hide piece section
+  if (isMyTurn && legalMoves.length > 0) {
+    pieceSection.style.display = 'block';
+  } else {
+    pieceSection.style.display = 'none';
+  }
+}
+
+// ── Piece tray ─────────────────────────────────────────────────────
+function updatePieceTray() {
+  pieceTray.innerHTML = '';
+  if (!isMyTurn || legalMoves.length === 0) return;
+
+  // Get available piece indices from legal moves
+  const availablePieces = new Set(legalMoves.map(m => m.piece_idx));
+  const allPieceIndices = new Set(legalMoves.map(m => m.piece_idx));
+
+  // Build buttons for pieces 0-20
+  for (let pi = 0; pi < 21; pi++) {
+    const btn = document.createElement('div');
+    btn.className = 'piece-btn';
+    if (!availablePieces.has(pi)) btn.classList.add('used');
+    if (pi === selectedPieceIdx) btn.classList.add('selected');
+
+    // Draw mini preview
+    const miniCanvas = document.createElement('canvas');
+    miniCanvas.width = 44; miniCanvas.height = 44;
+    const mctx = miniCanvas.getContext('2d');
+    drawMiniPiece(mctx, pi, 44);
+    btn.appendChild(miniCanvas);
+
+    btn.addEventListener('click', () => {
+      if (!availablePieces.has(pi)) return;
+      selectedPieceIdx = pi;
+      selectedOrientIdx = 0;
+      updatePieceTray();
+      drawBoard();
+    });
+
+    pieceTray.appendChild(btn);
+  }
+
+  // Update orient label
+  if (selectedPieceIdx !== null && knownPieceOrients[selectedPieceIdx]) {
+    const numOrients = Object.keys(knownPieceOrients[selectedPieceIdx]).length;
+    orientLabel.textContent = `(${selectedOrientIdx + 1}/${numOrients})`;
+  } else {
+    orientLabel.textContent = '';
+  }
+}
+
+function drawMiniPiece(ctx, pieceIdx, size) {
+  const orients = knownPieceOrients[pieceIdx];
+  if (!orients) return;
+  const cells = orients[Object.keys(orients)[0]]; // first orientation
+  if (!cells) return;
+
+  const maxR = Math.max(...cells.map(c => c.row)) + 1;
+  const maxC = Math.max(...cells.map(c => c.col)) + 1;
+  const cellSz = Math.min(size / Math.max(maxR, maxC, 3), 10);
+  const offX = (size - maxC * cellSz) / 2;
+  const offY = (size - maxR * cellSz) / 2;
+
+  const color = currentTurn === 'orange' ? COLORS.orange : COLORS.purple;
+  for (const cell of cells) {
+    ctx.fillStyle = color;
+    ctx.fillRect(offX + cell.col * cellSz, offY + cell.row * cellSz, cellSz - 1, cellSz - 1);
+  }
+}
+
+// ── Board drawing ──────────────────────────────────────────────────
+function drawBoard() {
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  if (!board) return;
+
+  // Draw grid
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const x = BOARD_PAD + c * CELL_SIZE;
+      const y = BOARD_PAD + r * CELL_SIZE;
+
+      // Cell background
+      ctx.fillStyle = COLORS.grid;
+      ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+
+      // Grid line
+      ctx.strokeStyle = COLORS.gridLine;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+
+      // Start positions
+      if ((r === 4 && c === 4) || (r === 9 && c === 9)) {
+        ctx.fillStyle = COLORS.startPos;
+        ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.beginPath();
+        ctx.arc(x + CELL_SIZE/2, y + CELL_SIZE/2, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Placed pieces
+      const cell = board[r]?.[c];
+      if (cell) {
+        ctx.fillStyle = cell === 'orange' ? COLORS.orange : COLORS.purple;
+        ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        ctx.fillStyle = cell === 'orange' ? 'rgba(255,200,100,0.3)' : 'rgba(200,150,255,0.3)';
+        ctx.fillRect(x + 4, y + 4, CELL_SIZE - 12, 3);
+      }
+    }
+  }
+
+  // Draw legal move highlights (corners where you can place)
+  if (isMyTurn && selectedPieceIdx === null && !gameOver) {
+    // Show all legal placement corners
+    const legalCells = new Set();
+    for (const m of legalMoves) {
+      for (const c of m.cells) legalCells.add(`${c.row},${c.col}`);
+    }
+    // Just show a subtle grid indicator — too many to highlight individually
+  }
+
+  // Draw hover preview
+  if (isMyTurn && selectedPieceIdx !== null && hoveredCell && !gameOver) {
+    const cells = getSelectedPieceCells(hoveredCell.row, hoveredCell.col);
+    if (cells) {
+      const isValid = findMatchingAction(selectedPieceIdx, selectedOrientIdx, hoveredCell.row, hoveredCell.col);
+      for (const cell of cells) {
+        const x = BOARD_PAD + cell.col * CELL_SIZE;
+        const y = BOARD_PAD + cell.row * CELL_SIZE;
+        if (cell.row >= 0 && cell.row < BOARD_SIZE && cell.col >= 0 && cell.col < BOARD_SIZE) {
+          ctx.fillStyle = isValid !== null ? COLORS.hover : COLORS.invalid;
+          ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        }
+      }
+    }
+  }
+
+  // Draw coordinates
+  ctx.fillStyle = '#666';
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'center';
+  for (let c = 0; c < BOARD_SIZE; c++) {
+    ctx.fillText(c, BOARD_PAD + c * CELL_SIZE + CELL_SIZE/2, BOARD_PAD - 8);
+  }
+  ctx.textAlign = 'right';
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    ctx.fillText(r, BOARD_PAD - 8, BOARD_PAD + r * CELL_SIZE + CELL_SIZE/2 + 4);
+  }
+}
+
+function getSelectedPieceCells(row, col) {
+  if (selectedPieceIdx === null) return null;
+  const orients = knownPieceOrients[selectedPieceIdx];
+  if (!orients) return null;
+  const keys = Object.keys(orients).map(Number).sort((a,b)=>a-b);
+  const oi = keys[selectedOrientIdx % keys.length];
+  const cells = orients[oi];
+  if (!cells) return null;
+  return cells.map(c => ({row: row + c.row, col: col + c.col}));
+}
+
+function findMatchingAction(pieceIdx, orientIdx, row, col) {
+  const keys = Object.keys(knownPieceOrients[pieceIdx] || {}).map(Number).sort((a,b)=>a-b);
+  const oi = keys[orientIdx % keys.length];
+  for (const m of legalMoves) {
+    if (m.piece_idx === pieceIdx && m.orientation === oi && m.row === row && m.col === col) {
+      return m.action;
+    }
+  }
+  return null;
+}
+
+// ── Mouse interaction ──────────────────────────────────────────────
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  const col = Math.floor((mx - BOARD_PAD) / CELL_SIZE);
+  const row = Math.floor((my - BOARD_PAD) / CELL_SIZE);
+
+  if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+    hoveredCell = {row, col};
+  } else {
+    hoveredCell = null;
+  }
+  drawBoard();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredCell = null;
+  drawBoard();
+});
+
+canvas.addEventListener('click', (e) => {
+  if (!isMyTurn || gameOver || !hoveredCell) return;
+  if (selectedPieceIdx === null) return;
+
+  const action = findMatchingAction(selectedPieceIdx, selectedOrientIdx, hoveredCell.row, hoveredCell.col);
+  if (action !== null) {
+    wsSend({type: 'move', action: {action: action}});
+    selectedPieceIdx = null;
+    selectedOrientIdx = 0;
+    hoveredCell = null;
+  }
+});
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'r' || e.key === 'R') {
+    rotateSelectedPiece();
+  } else if (e.key === 'f' || e.key === 'F') {
+    flipSelectedPiece();
+  }
+});
+
+function rotateSelectedPiece() {
+  if (selectedPieceIdx === null) return;
+  const keys = Object.keys(knownPieceOrients[selectedPieceIdx] || {});
+  if (keys.length === 0) return;
+  selectedOrientIdx = (selectedOrientIdx + 1) % keys.length;
+  orientLabel.textContent = `(${selectedOrientIdx + 1}/${keys.length})`;
+  drawBoard();
+}
+
+function flipSelectedPiece() {
+  // Flip skips orientations — jump by half
+  if (selectedPieceIdx === null) return;
+  const keys = Object.keys(knownPieceOrients[selectedPieceIdx] || {});
+  if (keys.length <= 1) return;
+  const half = Math.floor(keys.length / 2);
+  selectedOrientIdx = (selectedOrientIdx + half) % keys.length;
+  orientLabel.textContent = `(${selectedOrientIdx + 1}/${keys.length})`;
+  drawBoard();
+}
+
+btnRotate.addEventListener('click', rotateSelectedPiece);
+btnFlip.addEventListener('click', flipSelectedPiece);
+
+// ── Controls ───────────────────────────────────────────────────────
+selMode.addEventListener('change', () => {
+  const mode = selMode.value;
+  groupColor.style.display = mode === 'human_vs_ai' ? 'flex' : 'none';
+  groupSearchIters.style.display = mode === 'human_vs_human' ? 'none' : 'flex';
+});
+selMode.dispatchEvent(new Event('change'));
+
+btnNewGame.addEventListener('click', () => {
+  const mode = selMode.value;
+  const msg = {
+    type: 'new_game',
+    mode: mode,
+  };
+  if (mode === 'human_vs_ai') {
+    msg.human_color = selColor.value;
+    msg.search_iterations = parseInt(selSearchIters.value);
+  } else if (mode === 'ai_vs_ai') {
+    msg.search_iterations = parseInt(selSearchIters.value);
+    msg.delay_ms = 1000;
+  }
+  selectedPieceIdx = null;
+  selectedOrientIdx = 0;
+  knownPieceOrients = {};
+  wsSend(msg);
+});
+
+// ── Init ───────────────────────────────────────────────────────────
+drawBoard();
+wsConnect();
+</script>
+</body>
+</html>

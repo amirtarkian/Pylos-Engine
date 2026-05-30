@@ -66,6 +66,7 @@ class BlokusDuoGame(Game):
     """Blokus Duo game engine compatible with AlphaZero MCTS framework."""
 
     def __init__(self, **kwargs):
+        self._rich_obs = False  # single observation mode; kept for agent compatibility
         self.action_space = ACTION_SPACE
         # Board (14x14) + piece availability (21 per player) + turn indicator
         self.observation_shape = (BOARD_SIZE * BOARD_SIZE + NUM_PIECES * 2 + 1,)
@@ -167,14 +168,30 @@ class BlokusDuoGame(Game):
 
         self.pieces_available[self._turn][piece_idx] = False
         self.move_count[self._turn] += 1
-        self.actions_stack.append((action, piece_idx, cells, self._turn))
+        self.actions_stack.append(('place', action, piece_idx, cells, self._turn))
         self._turn *= -1
         self._invalidate_cache()
+
+        # Auto-pass if next player has no legal moves
+        self._check_and_pass()
 
     def undo_last_action(self):
         if not self.actions_stack:
             return
-        action, piece_idx, cells, player = self.actions_stack.pop()
+
+        entry = self.actions_stack.pop()
+
+        # Undo auto-pass entries first
+        if entry[0] == 'pass':
+            _, passed_player = entry
+            self._turn = passed_player
+            self._invalidate_cache()
+            # Now undo the actual move that preceded the pass
+            if self.actions_stack:
+                self.undo_last_action()
+            return
+
+        _, action, piece_idx, cells, player = entry
 
         for r, c in cells:
             self.board[r, c] = 0
@@ -212,12 +229,26 @@ class BlokusDuoGame(Game):
 
         return obs
 
+    def _check_and_pass(self):
+        """Auto-pass if current player has no moves but opponent does."""
+        if self.get_legal_actions():
+            return
+        # Current player can't move — check opponent
+        self._turn *= -1
+        self._invalidate_cache()
+        if self.get_legal_actions():
+            # Opponent can play — pass is implicit, turn stays switched
+            self.actions_stack.append(('pass', self._turn * -1))
+            return
+        # Neither can play — switch back, game is over
+        self._turn *= -1
+        self._invalidate_cache()
+
     def get_result(self):
         if self._result_cache is not None:
             return self._result_cache
 
-        # Game continues if either player can move
-        # Check current player first
+        # If current player has legal actions, game continues
         if self.get_legal_actions():
             return None
 
@@ -229,14 +260,9 @@ class BlokusDuoGame(Game):
         self._invalidate_cache()
 
         if opponent_can_move:
-            # Current player passes, opponent still plays
-            # In Blokus Duo, if you can't move you just pass.
-            # Game only ends when NEITHER player can move.
-            # For AlphaZero, we handle this by passing the turn.
             return None
 
-        # Neither player can move — game over
-        # Count cells placed by each player
+        # Neither player can move — game over, count cells
         p1_cells = int(np.sum(self.board == 1))
         p2_cells = int(np.sum(self.board == -1))
 
@@ -245,7 +271,7 @@ class BlokusDuoGame(Game):
         elif p2_cells > p1_cells:
             result = -1
         else:
-            result = 0  # draw (rare)
+            result = 0
 
         self._result_cache = result
         return result

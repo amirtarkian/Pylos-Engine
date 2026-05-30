@@ -219,11 +219,23 @@ async def get_loss_history():
 
 @app.get("/")
 async def index():
-    """Serve the frontend index.html."""
-    index_path = os.path.join(WEB_DIR, "index.html")
-    if os.path.isfile(index_path):
-        return FileResponse(index_path)
-    return JSONResponse({"error": "index.html not found"}, status_code=404)
+    """Serve the frontend page for the active game."""
+    if _game_name == "blokus_duo":
+        path = os.path.join(WEB_DIR, "blokus.html")
+    else:
+        path = os.path.join(WEB_DIR, "index.html")
+    if os.path.isfile(path):
+        return FileResponse(path)
+    return JSONResponse({"error": "frontend not found"}, status_code=404)
+
+
+@app.get("/blokus")
+async def blokus_page():
+    """Serve the Blokus Duo frontend."""
+    path = os.path.join(WEB_DIR, "blokus.html")
+    if os.path.isfile(path):
+        return FileResponse(path)
+    return JSONResponse({"error": "blokus.html not found"}, status_code=404)
 
 
 @app.get("/training")

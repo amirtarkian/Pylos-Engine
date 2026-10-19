@@ -438,7 +438,8 @@ async function refreshTraining() {
   }
   if (t.history.length) {
     lineChart($("chart-loss"), {
-      title: "Value loss (MSE, log scale)", logY: true, xName: "log point",
+      title: "Value loss (MSE, log scale)", logY: true,
+      xEndLabel: `step → ${t.history[t.history.length - 1].step.toLocaleString()}`,
       series: [{ name: "Value loss", color: C1, values: t.history.map((h) => h.value_loss),
                  labels: t.history.map((h) => `step ${h.step} · depth ${h.depth}`) }],
       format: (v) => v.toFixed(4),

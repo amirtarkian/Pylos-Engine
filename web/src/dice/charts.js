@@ -53,7 +53,8 @@ function showTip(el, tip, html, xFrac, yPx) {
 }
 
 export function lineChart(el, { title, series, current = null, height = 120, xName = "step",
-                                format = (v) => v.toFixed(1), logY = false, onPick = null }) {
+                                xEndLabel = null, format = (v) => v.toFixed(1), logY = false,
+                                onPick = null }) {
   const { svg, tip } = frame(el, title, series, height);
   const m = { l: 30, r: 8, t: 8, b: 18 };
   const n = Math.max(...series.map((s) => s.values.length));
@@ -76,7 +77,7 @@ export function lineChart(el, { title, series, current = null, height = 120, xNa
     lbl.textContent = logY ? (t >= 0 ? `1e${t}` : `1e${t}`) : (Number.isInteger(t) ? t : t.toFixed(1));
   }
   const xl = svgEl("text", { x: W - m.r, y: height - 3, "text-anchor": "end" }, axis);
-  xl.textContent = `${xName} → ${n - 1}`;
+  xl.textContent = xEndLabel ?? `${xName} → ${n - 1}`;
 
   if (current !== null) {
     svgEl("line", { x1: xs(current), x2: xs(current), y1: m.t, y2: height - m.b,

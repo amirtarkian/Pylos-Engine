@@ -18,6 +18,3 @@ engine/checkpoints_v6/
 
 # Dice cube: keep only the shipped model + eval manifest
 dicecube/checkpoints/*
-!dicecube/checkpoints/latest.pth
-!dicecube/checkpoints/manifest.json
-!dicecube/checkpoints/loss_history.jsonl

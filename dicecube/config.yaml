@@ -1,0 +1,25 @@
+model:
+  hidden: 384
+  num_blocks: 4
+  value_hidden: 128
+  policy_hidden: 128
+
+training:
+  steps: 24000
+  batch_size: 1000
+  learning_rate: 0.001
+  weight_decay: 0.0
+  policy_weight: 0.5
+  design: parity          # corners odd / edges even, as on the physical cube
+  start_depth: 1          # curriculum: scramble depth starts here...
+  max_depth: 30           # ...and grows by 1 on every target-network update
+  target_check_every: 50
+  target_loss_threshold: 0.1
+  max_steps_per_target: 300
+  threads: 4
+  seed: 0
+
+checkpoints:
+  dir: dicecube/checkpoints
+  save_every: 1000
+  keep_all: false

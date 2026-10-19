@@ -15,3 +15,9 @@ engine/checkpoints_v6/
 # Training artifacts
 **/training_progress.json
 **/loss_history.jsonl
+
+# Dice cube: keep only the shipped model + eval manifest
+dicecube/checkpoints/*
+!dicecube/checkpoints/latest.pth
+!dicecube/checkpoints/manifest.json
+!dicecube/checkpoints/loss_history.jsonl

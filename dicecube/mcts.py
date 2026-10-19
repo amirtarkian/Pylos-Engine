@@ -5,9 +5,11 @@ Differences from the two-player engine/mcts.py:
 
   * No opponent, so no value negation on backup.
   * The network predicts cost-to-go c(s) (moves to ANY solved state). An
-    edge's value is Q(s, a) = -(1 + best cost found below child a), and we
-    back up the *best* (max) value rather than the mean -- one good line is
-    all a puzzle needs (as in DeepCube's MCTS).
+    edge's value is Q(s, a) = -(1 + best cost found below child a), and a
+    node backs up the *best* (max) of its edges rather than the mean -- one
+    good line is all a puzzle needs (as in DeepCube's MCTS).
+  * Expanding a leaf scores it and all 12 children in one batch, so every
+    edge starts from a one-step lookahead instead of a guess.
   * Every expansion checks all 12 children for "solved" immediately, so a
     solution is found the moment the search touches its parent.
   * Leaves are collected in batches with virtual loss so the network runs
@@ -51,25 +53,46 @@ def _path(node):
     return actions[::-1]
 
 
-def _expand(node, cost, policy):
-    node.cost = float(cost)
-    node.child_states = all_children(node.state[None])[0]
+def _expand(node, policy, child_costs):
+    """Attach priors and one-step-lookahead values for all 12 moves."""
     node.children = [None] * NUM_ACTIONS
     p = policy.astype(np.float64).copy()
+    node.W = -(1.0 + child_costs.astype(np.float64))
     if node.parent is not None:
-        p[INVERSE_ACTION[node.action]] = 0.0   # never undo the last move
+        undo = INVERSE_ACTION[node.action]
+        p[undo] = 0.0                  # never undo the last move
+        node.W[undo] = -np.inf
     node.P = p / p.sum() if p.sum() > 0 else np.full(NUM_ACTIONS, 1 / NUM_ACTIONS)
     node.N = np.zeros(NUM_ACTIONS)
-    # First-play urgency: an unvisited move is assumed as good as this node
-    node.W = np.full(NUM_ACTIONS, -(1.0 + node.cost))
     node.VL = np.zeros(NUM_ACTIONS)
 
 
-def search(state, model, max_nodes=20000, time_limit=10.0, c_puct=1.0, batch_size=32,
-           virtual_loss=2.0, on_progress=None):
+def _evaluate(model, states):
+    """Score each state AND its 12 children in one forward pass.
+
+    Returns (costs (B,), policies (B, 12), child_states (B, 12, 54),
+    child_costs (B, 12)) with solved children costed 0.
+    """
+    children = all_children(states)
+    batch = np.concatenate([states, children.reshape(-1, 54)])
+    costs, policies = model.batched_inference(batch)
+    b = len(states)
+    child_costs = costs[b:].reshape(b, NUM_ACTIONS)
+    child_costs[is_solved(children.reshape(-1, 54)).reshape(b, NUM_ACTIONS)] = 0.0
+    return costs[:b], policies[:b], children, child_costs
+
+
+def search(state, model, max_nodes=200_000, time_limit=10.0, c_puct=0.5, batch_size=32,
+           virtual_loss=0.5, on_progress=None):
     """Find a move sequence from `state` to any solved state.
 
-    Returns dict(actions, solved, nodes, seconds, root_cost, best_cost_trace).
+    Each expansion scores the leaf and all 12 of its children in the same
+    batched forward pass, so W(s, a) starts as the one-step lookahead
+    -(1 + cost(child)) and is refined as the tree grows below it. A node's
+    value is the best of its moves: max_a W(s, a).
+
+    Returns dict(actions, solved, nodes, seconds, root_cost, tree); `nodes`
+    counts states scored by the network.
     """
     start = time.time()
     state = np.asarray(state, dtype=np.int8)
@@ -78,22 +101,21 @@ def search(state, model, max_nodes=20000, time_limit=10.0, c_puct=1.0, batch_siz
                 "root_cost": 0.0, "tree": []}
 
     root = Node(state)
-    cost, policy = model.batched_inference(state[None])
-    _expand(root, cost[0], policy[0])
-    nodes = 1
+    costs, policies, children, child_costs = _evaluate(model, state[None])
+    root.cost = float(costs[0])
+    root.child_states = children[0]
+    _expand(root, policies[0], child_costs[0])
+    nodes = 1 + NUM_ACTIONS
 
-    def check_children(node):
-        hits = np.nonzero(is_solved(node.child_states))[0]
-        return int(hits[0]) if len(hits) else None
-
-    hit = check_children(root)
-    if hit is not None:
-        return {"actions": [hit], "solved": True, "nodes": 1,
-                "seconds": time.time() - start, "root_cost": root.cost, "tree": []}
+    hits = np.nonzero(is_solved(root.child_states))[0]
+    if len(hits):
+        return {"actions": [int(hits[0])], "solved": True, "nodes": nodes,
+                "seconds": time.time() - start, "root_cost": root.cost,
+                "tree": root_summary(root)}
 
     while nodes < max_nodes and time.time() - start < time_limit:
         # ---- Phase 1: select a batch of leaves with virtual loss ----
-        leaves = []          # (parent, action, path)
+        leaves = []          # (parent, action)
         paths = []           # every selected path, to undo virtual loss
         claimed = set()
         for _ in range(batch_size):
@@ -108,36 +130,37 @@ def search(state, model, max_nodes=20000, time_limit=10.0, c_puct=1.0, batch_siz
                 if child is None:
                     break
                 node = child
-            key = (id(node), a)
             for n_, a_ in path:
                 n_.VL[a_] += virtual_loss
             paths.append(path)
-            if key in claimed:
-                continue
-            claimed.add(key)
-            leaves.append((node, a, path))
+            if (id(node), a) not in claimed:
+                claimed.add((id(node), a))
+                leaves.append((node, a))
 
-        # ---- Phase 2: evaluate all new leaves in one forward pass ----
-        new_states = np.stack([p.child_states[a] for p, a, _ in leaves])
-        costs, policies = model.batched_inference(new_states)
+        # ---- Phase 2: expand all new leaves with one forward pass ----
+        leaf_states = np.stack([p.child_states[a] for p, a in leaves])
+        costs, policies, children, child_costs = _evaluate(model, leaf_states)
+        nodes += len(leaves) * (1 + NUM_ACTIONS)
 
         found = None
-        for (parent, a, path), c, pol in zip(leaves, costs, policies):
-            child = Node(parent.child_states[a], parent, a)
-            _expand(child, c, pol)
+        for i, (parent, a) in enumerate(leaves):
+            child = Node(leaf_states[i], parent, a)
+            child.cost = float(costs[i])
+            child.child_states = children[i]
+            _expand(child, policies[i], child_costs[i])
             parent.children[a] = child
-            nodes += 1
-            hit = check_children(child)
-            if hit is not None and found is None:
-                found = _path(child) + [hit]
+            if found is None:
+                hits = np.nonzero(is_solved(children[i]))[0]
+                if len(hits):
+                    found = _path(child) + [int(hits[0])]
 
             # ---- Phase 3: back up the best (lowest) cost ----
-            best = child.cost
             node = child
+            best = -node.W.max()
             while node.parent is not None:
                 par, act = node.parent, node.action
                 par.N[act] += 1
-                par.W[act] = max(par.W[act], -(1.0 + best))
+                par.W[act] = -(1.0 + best)
                 best = -par.W.max()
                 node = par
 

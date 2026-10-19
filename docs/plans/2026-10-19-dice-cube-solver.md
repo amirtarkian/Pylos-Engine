@@ -118,4 +118,46 @@ and `2` means a half turn.
 
 ## Results
 
-Filled in from `python -m dicecube.evaluate` after training (see below).
+The network was trained for 19,000 steps (batch 1,000, about 2 hours on 4 CPU
+cores). Training was stopped there because the solve rate had stopped
+improving. The curriculum reached 30-move scrambles at step ~11,500.
+
+`python -m dicecube.evaluate --depths 4 8 12 16 20 30 --n 20 --time 5`, run on
+4 CPU cores with a 5 s budget per solver, 20 random cubes per depth:
+
+| Scramble depth | MCTS solved | MCTS moves | A\* solved | A\* moves | Kociemba solved | Kociemba moves |
+|---:|---:|---:|---:|---:|---:|---:|
+| 4  | 100% | 3.5 | 100% | 3.6  | 100% | 17.1 |
+| 8  | 60%  | 7.2 | 100% | 8.6  | 100% | 17.6 |
+| 12 | 50%  | 8.2 | 95%  | 8.9  | 100% | 17.2 |
+| 16 | 30%  | 8.7 | 90%  | 9.5  | 100% | 17.5 |
+| 20 | 30%  | 7.7 | 95%  | 10.1 | 100% | 17.2 |
+| 30 | 45%  | 7.9 | 95%  | 9.1  | 100% | 17.6 |
+
+"Moves" are face turns (half turn = 1) and are averaged over solved cubes only.
+
+What this shows:
+
+- **A fully scrambled dice cube is usually only about 9-10 face turns from
+  some solved state.** A normal Rubik's cube needs about 18 from a random
+  position. The many goal states make the puzzle much "shorter" than it looks.
+- **The network-guided A\* finds those short solutions**: about half the
+  length of Kociemba's, and 95% of the time within 5 s.
+- **Kociemba always succeeds** but aims at one fixed goal per attempt (it
+  tries up to 60), so it lands at ~17-18 moves. The solver keeps it as the
+  guaranteed fallback and the UI shows the shortest of all three.
+- **MCTS** is the closest analogue of the Pylos engine's search. It solves
+  short scrambles optimally and about a third to half of deep ones. Two things
+  mattered while tuning it. (1) Backing up the *best* child value, not a
+  running max that includes the first-play guess: the latter never lets a bad
+  branch lose its optimistic score. (2) Scoring all 12 children at expansion,
+  so edges start from a one-step lookahead. It still trails A\*. With a
+  policy this soft (many moves are equally good when there are many goals),
+  A\*'s global priority queue is a better fit than PUCT's per-node
+  exploration.
+- On its own (greedy, no search) the network solves ~100% of 3-move and ~45%
+  of 4-move scrambles. Search does the rest, as in AlphaZero.
+
+Ideas for further improvement: train longer or with a larger network on a GPU
+(DeepCubeA trained for days); add a "fall back to A\* inside MCTS" hybrid; or
+reuse the network to choose the most promising goal states for Kociemba.

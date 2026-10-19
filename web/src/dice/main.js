@@ -257,7 +257,7 @@ async function solve() {
     } else if (r.already_solved) {
       $("methods").innerHTML = '<div class="hint">Already solved — every face holds 1–9.</div>';
     } else if (r.best) {
-      pickMethod(r.results.mcts && r.results.mcts.found ? "mcts" : r.best);
+      pickMethod(r.best);
     }
     renderVisits();
   } finally {

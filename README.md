@@ -79,9 +79,31 @@ web/
 
 Pylos is a 2-player abstract strategy game on a 4-level pyramid. Players alternate placing or raising spheres. Completing a square (2x2) or line of your color lets you reclaim up to 2 pieces. The first player to place the apex sphere wins.
 
+## Dice Sudoku Cube Solver
+
+`dicecube/` reuses the same recipe (residual value/policy network + tree search)
+to solve the dice "Blind Dice Cube": a 3x3x3 whose stickers are 1-9 pip dice faces
+with 5 in every center. It is solved when **every face shows 1-9 once**, so there
+are hundreds of thousands of solved states, not just one.
+
+```bash
+bash run_dice.sh          # http://localhost:8001: 3D cube, sticker editor, solver, playback
+python -m dicecube.solver --scramble 20          # CLI
+python -m dicecube.solver "<54 digits, URFDLB>"  # solve your own cube
+python -m dicecube.train                         # retrain the network (dicecube/config.yaml)
+python -m dicecube.evaluate                      # benchmark by scramble depth
+```
+
+Three solvers run side by side: AlphaZero-style **MCTS** and **weighted A\*** guided
+by the trained network, plus **Kociemba two-phase** over many candidate goal
+states as a guaranteed fallback. See
+[docs/plans/2026-10-19-dice-cube-solver.md](docs/plans/2026-10-19-dice-cube-solver.md)
+for how it works.
+
 ## Testing
 
 ```bash
 source .venv/bin/activate
 python -m pytest engine/tests/ -v
+python -m pytest dicecube/tests/ -v
 ```
